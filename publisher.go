@@ -7,22 +7,23 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 // Publisher wraps a URL and provides a method that implements endpoint.Endpoint.
 type Publisher struct {
-	publisher *nats.Conn
+	publisher jetstream.JetStream
 	subject   string
 	enc       EncodeRequestFunc
 	dec       DecodeResponseFunc
-	before    []RequestFunc
+	before    []PublisherRequestFunc
 	after     []PublisherResponseFunc
 	timeout   time.Duration
 }
 
 // NewPublisher constructs a usable Publisher for a single remote method.
 func NewPublisher(
-	publisher *nats.Conn,
+	publisher jetstream.JetStream,
 	subject string,
 	enc EncodeRequestFunc,
 	dec DecodeResponseFunc,
@@ -44,9 +45,9 @@ func NewPublisher(
 // PublisherOption sets an optional parameter for clients.
 type PublisherOption func(*Publisher)
 
-// PublisherBefore sets the RequestFuncs that are applied to the outgoing NATS
+// PublisherBefore sets the PublisherRequestFuncs that are applied to the outgoing NATS
 // request before it's invoked.
-func PublisherBefore(before ...RequestFunc) PublisherOption {
+func PublisherBefore(before ...PublisherRequestFunc) PublisherOption {
 	return func(p *Publisher) { p.before = append(p.before, before...) }
 }
 
@@ -68,17 +69,17 @@ func (p Publisher) Endpoint() endpoint.Endpoint {
 		ctx, cancel := context.WithTimeout(ctx, p.timeout)
 		defer cancel()
 
-		msg := nats.Msg{Subject: p.subject}
+		msg := nats.NewMsg(p.subject)
 
-		if err := p.enc(ctx, &msg, request); err != nil {
+		if err := p.enc(ctx, msg, request); err != nil {
 			return nil, err
 		}
 
 		for _, f := range p.before {
-			ctx = f(ctx, &msg)
+			ctx = f(ctx, msg)
 		}
 
-		resp, err := p.publisher.RequestWithContext(ctx, msg.Subject, msg.Data)
+		resp, err := p.publisher.PublishMsg(ctx, msg)
 		if err != nil {
 			return nil, err
 		}

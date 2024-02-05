@@ -1,2 +1,2 @@
-// Package nats provides a NATS transport.
+// Package nats provides a NATS Jetstream transport.
 package jetstream

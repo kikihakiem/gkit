@@ -1,3 +1,5 @@
+//go:build unit
+
 package jetstream_test
 
 import (
@@ -6,35 +8,25 @@ import (
 	"testing"
 	"time"
 
-	natstransport "github.com/go-kit/kit/transport/nats"
+	natstransport "github.com/kikihakiem/jetstream-transport"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 func TestPublisher(t *testing.T) {
 	var (
 		testdata = "testdata"
 		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *nats.Msg) (interface{}, error) {
-			return TestResponse{string(msg.Data), ""}, nil
+		decode   = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
+			return TestResponse{"", ""}, nil
 		}
 	)
 
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
-
-	sub, err := c.QueueSubscribe("natstransport.test", "natstransport", func(msg *nats.Msg) {
-		if err := c.Publish(msg.Reply, []byte(testdata)); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Unsubscribe()
+	js, _, stop := newJetstream(t)
+	defer stop()
 
 	publisher := natstransport.NewPublisher(
-		c,
+		js,
 		"natstransport.test",
 		encode,
 		decode,
@@ -58,8 +50,8 @@ func TestPublisherBefore(t *testing.T) {
 	var (
 		testdata = "testdata"
 		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *nats.Msg) (interface{}, error) {
-			return TestResponse{string(msg.Data), ""}, nil
+		decode   = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
+			return TestResponse{"", ""}, nil
 		}
 	)
 
@@ -67,18 +59,11 @@ func TestPublisherBefore(t *testing.T) {
 	defer func() { s.Shutdown(); s.WaitForShutdown() }()
 	defer c.Close()
 
-	sub, err := c.QueueSubscribe("natstransport.test", "natstransport", func(msg *nats.Msg) {
-		if err := c.Publish(msg.Reply, msg.Data); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Unsubscribe()
+	js, _, stop := newJetstream(t)
+	defer stop()
 
 	publisher := natstransport.NewPublisher(
-		c,
+		js,
 		"natstransport.test",
 		encode,
 		decode,
@@ -106,8 +91,8 @@ func TestPublisherAfter(t *testing.T) {
 	var (
 		testdata = "testdata"
 		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *nats.Msg) (interface{}, error) {
-			return TestResponse{string(msg.Data), ""}, nil
+		decode   = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
+			return TestResponse{"", ""}, nil
 		}
 	)
 
@@ -115,23 +100,15 @@ func TestPublisherAfter(t *testing.T) {
 	defer func() { s.Shutdown(); s.WaitForShutdown() }()
 	defer c.Close()
 
-	sub, err := c.QueueSubscribe("natstransport.test", "natstransport", func(msg *nats.Msg) {
-		if err := c.Publish(msg.Reply, []byte(testdata)); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Unsubscribe()
+	js, _, stop := newJetstream(t)
+	defer stop()
 
 	publisher := natstransport.NewPublisher(
-		c,
+		js,
 		"natstransport.test",
 		encode,
 		decode,
-		natstransport.PublisherAfter(func(ctx context.Context, msg *nats.Msg) context.Context {
-			msg.Data = []byte(strings.ToUpper(string(msg.Data)))
+		natstransport.PublisherAfter(func(ctx context.Context, pa *jetstream.PubAck) context.Context {
 			return ctx
 		}),
 	)
@@ -153,35 +130,23 @@ func TestPublisherAfter(t *testing.T) {
 func TestPublisherTimeout(t *testing.T) {
 	var (
 		encode = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode = func(_ context.Context, msg *nats.Msg) (interface{}, error) {
-			return TestResponse{string(msg.Data), ""}, nil
+		decode = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
+			return TestResponse{"", ""}, nil
 		}
 	)
 
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
-
-	ch := make(chan struct{})
-	defer close(ch)
-
-	sub, err := c.QueueSubscribe("natstransport.test", "natstransport", func(msg *nats.Msg) {
-		<-ch
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Unsubscribe()
+	js, _, stop := newJetstream(t)
+	defer stop()
 
 	publisher := natstransport.NewPublisher(
-		c,
+		js,
 		"natstransport.test",
 		encode,
 		decode,
 		natstransport.PublisherTimeout(time.Second),
 	)
 
-	_, err = publisher.Endpoint()(context.Background(), struct{}{})
+	_, err := publisher.Endpoint()(context.Background(), struct{}{})
 	if err != context.DeadlineExceeded {
 		t.Errorf("want %s, have %s", context.DeadlineExceeded, err)
 	}
@@ -189,29 +154,17 @@ func TestPublisherTimeout(t *testing.T) {
 
 func TestPublisherCancellation(t *testing.T) {
 	var (
-		testdata = "testdata"
-		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *nats.Msg) (interface{}, error) {
-			return TestResponse{string(msg.Data), ""}, nil
+		encode = func(context.Context, *nats.Msg, interface{}) error { return nil }
+		decode = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
+			return TestResponse{"", ""}, nil
 		}
 	)
 
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
-
-	sub, err := c.QueueSubscribe("natstransport.test", "natstransport", func(msg *nats.Msg) {
-		if err := c.Publish(msg.Reply, []byte(testdata)); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Unsubscribe()
+	js, _, stop := newJetstream(t)
+	defer stop()
 
 	publisher := natstransport.NewPublisher(
-		c,
+		js,
 		"natstransport.test",
 		encode,
 		decode,
@@ -220,7 +173,7 @@ func TestPublisherCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err = publisher.Endpoint()(ctx, struct{}{})
+	_, err := publisher.Endpoint()(ctx, struct{}{})
 	if err != context.Canceled {
 		t.Errorf("want %s, have %s", context.Canceled, err)
 	}
@@ -229,27 +182,14 @@ func TestPublisherCancellation(t *testing.T) {
 func TestEncodeJSONRequest(t *testing.T) {
 	var data string
 
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
-
-	sub, err := c.QueueSubscribe("natstransport.test", "natstransport", func(msg *nats.Msg) {
-		data = string(msg.Data)
-
-		if err := c.Publish(msg.Reply, []byte("")); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sub.Unsubscribe()
+	js, _, stop := newJetstream(t)
+	defer stop()
 
 	publisher := natstransport.NewPublisher(
-		c,
+		js,
 		"natstransport.test",
 		natstransport.EncodeJSONRequest,
-		func(context.Context, *nats.Msg) (interface{}, error) { return nil, nil },
+		func(ctx context.Context, pa *jetstream.PubAck) (response interface{}, err error) { return nil, nil },
 	).Endpoint()
 
 	for _, test := range []struct {

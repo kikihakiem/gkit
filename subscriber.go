@@ -8,7 +8,7 @@ import (
 	"github.com/go-kit/kit/transport"
 	"github.com/go-kit/log"
 
-	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 // Subscriber wraps an endpoint and provides nats.MsgHandler.
@@ -16,7 +16,7 @@ type Subscriber struct {
 	e            endpoint.Endpoint
 	dec          DecodeRequestFunc
 	enc          EncodeResponseFunc
-	before       []RequestFunc
+	before       []SubscriberRequestFunc
 	after        []SubscriberResponseFunc
 	errorEncoder ErrorEncoder
 	finalizer    []SubscriberFinalizerFunc
@@ -49,7 +49,7 @@ type SubscriberOption func(*Subscriber)
 
 // SubscriberBefore functions are executed on the publisher request object before the
 // request is decoded.
-func SubscriberBefore(before ...RequestFunc) SubscriberOption {
+func SubscriberBefore(before ...SubscriberRequestFunc) SubscriberOption {
 	return func(s *Subscriber) { s.before = append(s.before, before...) }
 }
 
@@ -91,8 +91,8 @@ func SubscriberFinalizer(f ...SubscriberFinalizerFunc) SubscriberOption {
 }
 
 // ServeMsg provides nats.MsgHandler.
-func (s Subscriber) ServeMsg(nc *nats.Conn) func(msg *nats.Msg) {
-	return func(msg *nats.Msg) {
+func (s Subscriber) HandleMessage(js jetstream.JetStream) func(jetstream.Msg) {
+	return func(msg jetstream.Msg) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -111,34 +111,34 @@ func (s Subscriber) ServeMsg(nc *nats.Conn) func(msg *nats.Msg) {
 		request, err := s.dec(ctx, msg)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			if msg.Reply == "" {
+			if msg.Reply() == "" {
 				return
 			}
-			s.errorEncoder(ctx, err, msg.Reply, nc)
+			s.errorEncoder(ctx, err, msg.Reply(), js)
 			return
 		}
 
 		response, err := s.e(ctx, request)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			if msg.Reply == "" {
+			if msg.Reply() == "" {
 				return
 			}
-			s.errorEncoder(ctx, err, msg.Reply, nc)
+			s.errorEncoder(ctx, err, msg.Reply(), js)
 			return
 		}
 
 		for _, f := range s.after {
-			ctx = f(ctx, nc)
+			ctx = f(ctx, js)
 		}
 
-		if msg.Reply == "" {
+		if msg.Reply() == "" {
 			return
 		}
 
-		if err := s.enc(ctx, msg.Reply, nc, response); err != nil {
+		if err := s.enc(ctx, msg.Reply(), js, response); err != nil {
 			s.errorHandler.Handle(ctx, err)
-			s.errorEncoder(ctx, err, msg.Reply, nc)
+			s.errorEncoder(ctx, err, msg.Reply(), js)
 			return
 		}
 	}
@@ -148,33 +148,34 @@ func (s Subscriber) ServeMsg(nc *nats.Conn) func(msg *nats.Msg) {
 // Users are encouraged to use custom ErrorEncoders to encode errors to
 // their replies, and will likely want to pass and check for their own error
 // types.
-type ErrorEncoder func(ctx context.Context, err error, reply string, nc *nats.Conn)
+type ErrorEncoder func(ctx context.Context, err error, reply string, js jetstream.JetStream)
 
 // SubscriberFinalizerFunc can be used to perform work at the end of an request
 // from a publisher, after the response has been written to the publisher. The principal
 // intended use is for request logging.
-type SubscriberFinalizerFunc func(ctx context.Context, msg *nats.Msg)
+type SubscriberFinalizerFunc func(ctx context.Context, msg jetstream.Msg)
 
 // NopRequestDecoder is a DecodeRequestFunc that can be used for requests that do not
 // need to be decoded, and simply returns nil, nil.
-func NopRequestDecoder(_ context.Context, _ *nats.Msg) (interface{}, error) {
+func NopRequestDecoder(context.Context, jetstream.Msg) (request interface{}, err error) {
 	return nil, nil
 }
 
 // EncodeJSONResponse is a EncodeResponseFunc that serializes the response as a
 // JSON object to the subscriber reply. Many JSON-over services can use it as
 // a sensible default.
-func EncodeJSONResponse(_ context.Context, reply string, nc *nats.Conn, response interface{}) error {
+func EncodeJSONResponse(ctx context.Context, reply string, js jetstream.JetStream, response interface{}) error {
 	b, err := json.Marshal(response)
 	if err != nil {
 		return err
 	}
 
-	return nc.Publish(reply, b)
+	_, err = js.Publish(ctx, reply, b)
+	return err
 }
 
 // DefaultErrorEncoder writes the error to the subscriber reply.
-func DefaultErrorEncoder(_ context.Context, err error, reply string, nc *nats.Conn) {
+func DefaultErrorEncoder(ctx context.Context, err error, reply string, js jetstream.JetStream) {
 	logger := log.NewNopLogger()
 
 	type Response struct {
@@ -191,7 +192,7 @@ func DefaultErrorEncoder(_ context.Context, err error, reply string, nc *nats.Co
 		return
 	}
 
-	if err := nc.Publish(reply, b); err != nil {
+	if _, err := js.Publish(ctx, reply, b); err != nil {
 		logger.Log("err", err)
 	}
 }
