@@ -35,7 +35,7 @@ func newNATSConn(t *testing.T) (*server.Server, *nats.Conn) {
 	return srv, nc
 }
 
-func newJetstream(t *testing.T) (jetstream.JetStream, jetstream.Stream, func()) {
+func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetstream.Stream, func()) {
 	t.Helper()
 
 	srv, nc := newNATSConn(t)
@@ -45,12 +45,9 @@ func newJetstream(t *testing.T) (jetstream.JetStream, jetstream.Stream, func()) 
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	stream, err := js.CreateStream(ctx, jetstream.StreamConfig{
-		Name:     "testStream",
-		Subjects: []string{"testSubject"},
+		Name:     "test:stream",
+		Subjects: []string{"natstransport.test.*"},
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -64,26 +61,13 @@ func newJetstream(t *testing.T) (jetstream.JetStream, jetstream.Stream, func()) 
 func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.JetStream, func()) {
 	t.Helper()
 
-	srv, nc := newNATSConn(t)
-
-	js, err := jetstream.New(nc)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	stream, err := js.CreateStream(ctx, jetstream.StreamConfig{
-		Name:     "testStream",
-		Subjects: []string{"testSubject"},
-	})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	js, stream, stop := newJetstream(ctx, t)
 
 	consumer, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable: "testConsumer",
+		Durable: "test:consumer",
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -96,7 +80,7 @@ func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.Jet
 
 	return js, func() {
 		consumeCtx.Stop()
-		shutdownJSServerAndRemoveStorage(t, srv)
+		stop()
 	}
 }
 

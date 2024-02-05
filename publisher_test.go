@@ -4,7 +4,6 @@ package jetstream_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -15,19 +14,18 @@ import (
 
 func TestPublisher(t *testing.T) {
 	var (
-		testdata = "testdata"
-		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
-			return TestResponse{"", ""}, nil
+		encode = func(context.Context, *nats.Msg, interface{}) error { return nil }
+		decode = func(_ context.Context, pa *jetstream.PubAck) (interface{}, error) {
+			return pa, nil
 		}
 	)
 
-	js, _, stop := newJetstream(t)
+	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
 	publisher := natstransport.NewPublisher(
 		js,
-		"natstransport.test",
+		"natstransport.test.1",
 		encode,
 		decode,
 	)
@@ -37,78 +35,75 @@ func TestPublisher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	response, ok := res.(TestResponse)
+	response, ok := res.(*jetstream.PubAck)
 	if !ok {
-		t.Fatal("response should be TestResponse")
+		t.Fatal("response should be a *jetstream.PubAck")
 	}
-	if want, have := testdata, response.String; want != have {
+	if want, have := "test:stream", response.Stream; want != have {
 		t.Errorf("want %q, have %q", want, have)
 	}
 }
 
 func TestPublisherBefore(t *testing.T) {
 	var (
-		testdata = "testdata"
-		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
-			return TestResponse{"", ""}, nil
+		testData = "foobar"
+		encode   = func(_ context.Context, msg *nats.Msg, req interface{}) error {
+			request := req.(string)
+			msg.Data = []byte(request)
+
+			return nil
+		}
+		decode = func(_ context.Context, pa *jetstream.PubAck) (interface{}, error) {
+			return pa, nil
 		}
 	)
 
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
-
-	js, _, stop := newJetstream(t)
+	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
 	publisher := natstransport.NewPublisher(
 		js,
-		"natstransport.test",
+		"natstransport.test.1",
 		encode,
 		decode,
 		natstransport.PublisherBefore(func(ctx context.Context, msg *nats.Msg) context.Context {
-			msg.Data = []byte(strings.ToUpper(string(testdata)))
+			if want, have := testData, string(msg.Data); want != have {
+				t.Errorf("want %q, have %q", want, have)
+			}
 			return ctx
 		}),
 	)
 
-	res, err := publisher.Endpoint()(context.Background(), struct{}{})
+	res, err := publisher.Endpoint()(context.Background(), testData)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	response, ok := res.(TestResponse)
+	_, ok := res.(*jetstream.PubAck)
 	if !ok {
-		t.Fatal("response should be TestResponse")
-	}
-	if want, have := strings.ToUpper(testdata), response.String; want != have {
-		t.Errorf("want %q, have %q", want, have)
+		t.Fatal("response should be a *jetstream.PubAck")
 	}
 }
 
 func TestPublisherAfter(t *testing.T) {
 	var (
-		testdata = "testdata"
-		encode   = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode   = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
-			return TestResponse{"", ""}, nil
+		alteredStreamName = "foo"
+		encode            = func(context.Context, *nats.Msg, interface{}) error { return nil }
+		decode            = func(_ context.Context, pa *jetstream.PubAck) (interface{}, error) {
+			return pa, nil
 		}
 	)
 
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
-
-	js, _, stop := newJetstream(t)
+	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
 	publisher := natstransport.NewPublisher(
 		js,
-		"natstransport.test",
+		"natstransport.test.2",
 		encode,
 		decode,
 		natstransport.PublisherAfter(func(ctx context.Context, pa *jetstream.PubAck) context.Context {
+			pa.Stream = alteredStreamName // alter the stream name just to check if this function is called
 			return ctx
 		}),
 	)
@@ -118,11 +113,11 @@ func TestPublisherAfter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	response, ok := res.(TestResponse)
+	response, ok := res.(*jetstream.PubAck)
 	if !ok {
-		t.Fatal("response should be TestResponse")
+		t.Fatal("response should be a *jetstream.PubAck")
 	}
-	if want, have := strings.ToUpper(testdata), response.String; want != have {
+	if want, have := alteredStreamName, response.Stream; want != have {
 		t.Errorf("want %q, have %q", want, have)
 	}
 }
@@ -130,20 +125,20 @@ func TestPublisherAfter(t *testing.T) {
 func TestPublisherTimeout(t *testing.T) {
 	var (
 		encode = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
-			return TestResponse{"", ""}, nil
+		decode = func(_ context.Context, pa *jetstream.PubAck) (interface{}, error) {
+			return pa, nil
 		}
 	)
 
-	js, _, stop := newJetstream(t)
+	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
 	publisher := natstransport.NewPublisher(
 		js,
-		"natstransport.test",
+		"natstransport.test.3",
 		encode,
 		decode,
-		natstransport.PublisherTimeout(time.Second),
+		natstransport.PublisherTimeout(time.Nanosecond), // set a very low timeout
 	)
 
 	_, err := publisher.Endpoint()(context.Background(), struct{}{})
@@ -155,17 +150,17 @@ func TestPublisherTimeout(t *testing.T) {
 func TestPublisherCancellation(t *testing.T) {
 	var (
 		encode = func(context.Context, *nats.Msg, interface{}) error { return nil }
-		decode = func(_ context.Context, msg *jetstream.PubAck) (interface{}, error) {
-			return TestResponse{"", ""}, nil
+		decode = func(_ context.Context, pa *jetstream.PubAck) (interface{}, error) {
+			return pa, nil
 		}
 	)
 
-	js, _, stop := newJetstream(t)
+	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
 	publisher := natstransport.NewPublisher(
 		js,
-		"natstransport.test",
+		"natstransport.test.4",
 		encode,
 		decode,
 	)
@@ -180,16 +175,20 @@ func TestPublisherCancellation(t *testing.T) {
 }
 
 func TestEncodeJSONRequest(t *testing.T) {
-	var data string
+	encoded := make(chan string, 1)
 
-	js, _, stop := newJetstream(t)
+	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
 	publisher := natstransport.NewPublisher(
 		js,
-		"natstransport.test",
+		"natstransport.test.5",
 		natstransport.EncodeJSONRequest,
 		func(ctx context.Context, pa *jetstream.PubAck) (response interface{}, err error) { return nil, nil },
+		natstransport.PublisherBefore(func(ctx context.Context, msg *nats.Msg) context.Context {
+			encoded <- string(msg.Data)
+			return ctx
+		}),
 	).Endpoint()
 
 	for _, test := range []struct {
@@ -210,7 +209,7 @@ func TestEncodeJSONRequest(t *testing.T) {
 			continue
 		}
 
-		if data != test.body {
+		if data := <-encoded; data != test.body {
 			t.Errorf("%v: actual %#v, expected %#v", test.value, data, test.body)
 		}
 	}
