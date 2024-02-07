@@ -54,7 +54,7 @@ func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetst
 	}
 }
 
-func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.JetStream, func()) {
+func newConsumer[Req, Res any](t *testing.T, handler *natstransport.Subscriber[Req, Res]) (jetstream.JetStream, func()) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

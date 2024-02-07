@@ -11,24 +11,24 @@ import (
 
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/transport"
 	jstransport "github.com/kikihakiem/jetstream-transport"
 )
 
+type emptyStruct struct{}
+
 func TestSubscriberBadDecode(t *testing.T) {
 	var (
-		reqDecoder = func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) {
-			return struct{}{}, errors.New("dang")
+		reqDecoder = func(context.Context, jetstream.Msg) (emptyStruct, error) {
+			return emptyStruct{}, errors.New("dang")
 		}
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber(
-		endpoint.Nop,
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		jstransport.NopEndpoint[emptyStruct, emptyStruct],
 		reqDecoder,
 		jstransport.NopResponseEncoder,
-		jstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -45,15 +45,15 @@ func TestSubscriberBadDecode(t *testing.T) {
 
 func TestSubscriberBadEndpoint(t *testing.T) {
 	var (
-		endpt   = func(context.Context, interface{}) (interface{}, error) { return struct{}{}, errors.New("dang") }
+		endpt   = func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errors.New("dang") }
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber(
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		endpt,
 		jstransport.NopRequestDecoder,
 		jstransport.NopResponseEncoder,
-		jstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -70,17 +70,17 @@ func TestSubscriberBadEndpoint(t *testing.T) {
 
 func TestSubscriberBadEncode(t *testing.T) {
 	var (
-		respEncoder = func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error {
+		respEncoder = func(context.Context, string, jetstream.JetStream, emptyStruct) error {
 			return errors.New("dang")
 		}
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber(
-		endpoint.Nop,
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		jstransport.NopEndpoint[emptyStruct, emptyStruct],
 		jstransport.NopRequestDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -97,17 +97,17 @@ func TestSubscriberBadEncode(t *testing.T) {
 
 func TestSubscriberErrorEncoder(t *testing.T) {
 	var (
-		respEncoder = func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error {
+		respEncoder = func(context.Context, string, jetstream.JetStream, emptyStruct) error {
 			return errors.New("dang")
 		}
 		resChan = make(chan string, 1)
 	)
 
-	handler := jstransport.NewSubscriber(
-		endpoint.Nop,
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		jstransport.NopEndpoint[emptyStruct, emptyStruct],
 		jstransport.NopRequestDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorEncoder(func(ctx context.Context, err error, reply string, js jetstream.JetStream) {
+		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](func(ctx context.Context, err error, reply string, js jetstream.JetStream) {
 			future, _ := js.PublishAsync(reply, []byte(err.Error()))
 			resChan <- string(future.Msg().Data)
 		}),
@@ -125,20 +125,18 @@ func TestSubscriberErrorEncoder(t *testing.T) {
 
 func TestSubscriberHappyPath(t *testing.T) {
 	var (
-		endpt = func(_ context.Context, req interface{}) (interface{}, error) {
-			request, ok := req.(string)
-			if want, have := "test data foo", request; !ok || want != have {
+		endpt = func(_ context.Context, req string) (string, error) {
+			if want, have := "test data foo", req; want != have {
 				t.Errorf("want %s, have %s", want, have)
 			}
 
-			return request + " bar", nil
+			return req + " bar", nil
 		}
-		reqDecoder = func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) {
+		reqDecoder = func(ctx context.Context, m jetstream.Msg) (string, error) {
 			return string(m.Data()) + " foo", nil
 		}
-		respEncoder = func(ctx context.Context, s string, js jetstream.JetStream, resp interface{}) error {
-			response, ok := resp.(string)
-			if want, have := "test data foo bar", response; !ok || want != have {
+		respEncoder = func(ctx context.Context, s string, js jetstream.JetStream, resp string) error {
+			if want, have := "test data foo bar", resp; want != have {
 				t.Errorf("want %s, have %s", want, have)
 			}
 
@@ -147,11 +145,11 @@ func TestSubscriberHappyPath(t *testing.T) {
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber(
+	handler := jstransport.NewSubscriber[string, string](
 		endpt,
 		reqDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		jstransport.SubscriberErrorHandler[string, string](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -171,16 +169,16 @@ func TestSubscriberHappyPath(t *testing.T) {
 func TestMultipleSubscriberBefore(t *testing.T) {
 	errChan := make(chan error, 1)
 
-	handler := jstransport.NewSubscriber(
-		endpoint.Nop,
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		jstransport.NopEndpoint[emptyStruct, emptyStruct],
 		jstransport.NopRequestDecoder,
 		jstransport.NopResponseEncoder,
-		jstransport.SubscriberBefore(func(ctx context.Context, m jetstream.Msg) context.Context {
+		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m jetstream.Msg) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		jstransport.SubscriberBefore(func(ctx context.Context, m jetstream.Msg) context.Context {
+		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m jetstream.Msg) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberBefore are used")
 			} else {
@@ -203,20 +201,20 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 
 func TestMultipleSubscriberAfter(t *testing.T) {
 	var (
-		respEncoder = func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error {
+		respEncoder = func(context.Context, string, jetstream.JetStream, emptyStruct) error {
 			return errors.New("dang")
 		}
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber(
-		endpoint.Nop,
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		jstransport.NopEndpoint[emptyStruct, emptyStruct],
 		jstransport.NopRequestDecoder,
 		respEncoder,
-		jstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context {
+		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context {
+		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -240,14 +238,14 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 func TestSubscriberFinalizerFunc(t *testing.T) {
 	errChan := make(chan error, 1)
 
-	handler := jstransport.NewSubscriber(
-		endpoint.Nop,
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		jstransport.NopEndpoint[emptyStruct, emptyStruct],
 		jstransport.NopRequestDecoder,
 		jstransport.NopResponseEncoder,
-		jstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context {
+		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberFinalizer(func(ctx context.Context, msg jetstream.Msg, resp any) {
+		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, msg jetstream.Msg, resp emptyStruct) {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -289,13 +287,13 @@ func TestEncodeJSONResponse(t *testing.T) {
 func TestDefaultErrorEncoder(t *testing.T) {
 	dataChan := make(chan string, 1)
 
-	handler := jstransport.NewSubscriber(
-		func(context.Context, interface{}) (interface{}, error) {
-			return nil, errors.New("dang")
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		func(context.Context, emptyStruct) (emptyStruct, error) {
+			return emptyStruct{}, errors.New("dang")
 		},
 		jstransport.NopRequestDecoder,
 		jstransport.NopResponseEncoder,
-		jstransport.SubscriberErrorEncoder(jstransport.DefaultErrorEncoder),
+		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](jstransport.DefaultErrorEncoder),
 	)
 
 	handler.HandleMessage(&jetstreamMock{dataChan: dataChan})(&jetstreamMsg{replySubject: "foo"})
