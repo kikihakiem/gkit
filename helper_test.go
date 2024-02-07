@@ -24,7 +24,6 @@ func newNATSConn(t *testing.T) (*server.Server, *nats.Conn) {
 	opts := natsserver.DefaultTestOptions
 	opts.Port = -1
 	opts.JetStream = true
-
 	srv := natsserver.RunServer(&opts)
 
 	nc, err := nats.Connect(srv.ClientURL())
@@ -47,13 +46,14 @@ func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetst
 
 	stream, err := js.CreateStream(ctx, jetstream.StreamConfig{
 		Name:     "test:stream",
-		Subjects: []string{"natstransport.test.*"},
+		Subjects: []string{"natstransport.>"},
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	return js, stream, func() {
+		nc.Close()
 		shutdownJSServerAndRemoveStorage(t, srv)
 	}
 }
@@ -64,11 +64,9 @@ func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.Jet
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	js, stream, stop := newJetstream(ctx, t)
+	js, stream, stopServer := newJetstream(ctx, t)
 
-	consumer, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{
-		Durable: "test:consumer",
-	})
+	consumer, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -80,7 +78,7 @@ func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.Jet
 
 	return js, func() {
 		consumeCtx.Stop()
-		stop()
+		stopServer()
 	}
 }
 
@@ -98,4 +96,73 @@ func shutdownJSServerAndRemoveStorage(t *testing.T, s *server.Server) {
 		}
 	}
 	s.WaitForShutdown()
+}
+
+func publish(t *testing.T, js jetstream.JetStream, message string) {
+	_, err := js.Publish(context.Background(), "natstransport.test.99", []byte(message))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+type jetstreamMock struct {
+	jetstream.JetStream
+	dataChan chan string
+}
+
+func (jm *jetstreamMock) Publish(ctx context.Context, subject string, data []byte, opts ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
+	go func() {
+		jm.dataChan <- string(data)
+	}()
+
+	return nil, nil
+}
+
+type jetstreamMsg struct {
+	data         []byte
+	replySubject string
+}
+
+func (jm *jetstreamMsg) Metadata() (*jetstream.MsgMetadata, error) {
+	return nil, nil
+}
+
+func (jm *jetstreamMsg) Data() []byte {
+	return jm.data
+}
+
+func (jm *jetstreamMsg) Headers() nats.Header {
+	return nil
+}
+
+func (jm *jetstreamMsg) Subject() string {
+	return ""
+}
+
+func (jm *jetstreamMsg) Reply() string {
+	return jm.replySubject
+}
+
+func (jm *jetstreamMsg) Ack() error {
+	return nil
+}
+
+func (jm *jetstreamMsg) DoubleAck(context.Context) error {
+	return nil
+}
+
+func (jm *jetstreamMsg) Nak() error {
+	return nil
+}
+
+func (jm *jetstreamMsg) NakWithDelay(delay time.Duration) error {
+	return nil
+}
+
+func (jm *jetstreamMsg) InProgress() error {
+	return nil
+}
+
+func (jm *jetstreamMsg) Term() error {
+	return nil
 }

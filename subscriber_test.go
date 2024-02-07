@@ -4,23 +4,20 @@ package jetstream_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"sync"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/transport"
 	natstransport "github.com/kikihakiem/jetstream-transport"
 )
 
 func TestSubscriberBadDecode(t *testing.T) {
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
+	errChan := make(chan error, 1)
 
 	handler := natstransport.NewSubscriber(
 		func(context.Context, interface{}) (interface{}, error) { return struct{}{}, nil },
@@ -28,37 +25,45 @@ func TestSubscriberBadDecode(t *testing.T) {
 			return struct{}{}, errors.New("dang")
 		},
 		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
+		natstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+			errChan <- err
+		})),
 	)
 
-	resp := testRequest(t, c, handler)
+	js, stop := newConsumer(t, handler)
+	defer stop()
 
-	if want, have := "dang", resp.Error; want != have {
+	publish(t, js, "test data")
+
+	if want, have := "dang", (<-errChan).Error(); want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 }
 
 func TestSubscriberBadEndpoint(t *testing.T) {
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
+	errChan := make(chan error, 1)
 
 	handler := natstransport.NewSubscriber(
 		func(context.Context, interface{}) (interface{}, error) { return struct{}{}, errors.New("dang") },
 		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
 		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
+		natstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+			errChan <- err
+		})),
 	)
 
-	resp := testRequest(t, c, handler)
+	js, stop := newConsumer(t, handler)
+	defer stop()
 
-	if want, have := "dang", resp.Error; want != have {
+	publish(t, js, "test data")
+
+	if want, have := "dang", (<-errChan).Error(); want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 }
 
 func TestSubscriberBadEncode(t *testing.T) {
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
+	errChan := make(chan error, 1)
 
 	handler := natstransport.NewSubscriber(
 		func(context.Context, interface{}) (interface{}, error) { return struct{}{}, nil },
@@ -66,87 +71,77 @@ func TestSubscriberBadEncode(t *testing.T) {
 		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error {
 			return errors.New("dang")
 		},
+		natstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+			errChan <- err
+		})),
 	)
 
-	resp := testRequest(t, c, handler)
+	js, stop := newConsumer(t, handler)
+	defer stop()
 
-	if want, have := "dang", resp.Error; want != have {
+	publish(t, js, "test data")
+
+	if want, have := "dang", (<-errChan).Error(); want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 }
 
 func TestSubscriberErrorEncoder(t *testing.T) {
-	s, c := newNATSConn(t)
-	defer func() { s.Shutdown(); s.WaitForShutdown() }()
-	defer c.Close()
+	resChan := make(chan string, 1)
 
-	errTeapot := errors.New("teapot")
-	code := func(err error) error {
-		if errors.Is(err, errTeapot) {
-			return err
-		}
-		return errors.New("dang")
-	}
 	handler := natstransport.NewSubscriber(
-		func(context.Context, interface{}) (interface{}, error) { return struct{}{}, errTeapot },
+		func(context.Context, interface{}) (interface{}, error) { return struct{}{}, nil },
 		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
-		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
+		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error {
+			return errors.New("dang")
+		},
 		natstransport.SubscriberErrorEncoder(func(ctx context.Context, err error, reply string, js jetstream.JetStream) {
-			var r TestResponse
-			r.Error = code(err).Error()
-
-			b, err := json.Marshal(r)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if err := c.Publish(reply, b); err != nil {
-				t.Fatal(err)
-			}
+			future, _ := js.PublishAsync(reply, []byte(err.Error()))
+			resChan <- string(future.Msg().Data)
 		}),
 	)
 
-	resp := testRequest(t, c, handler)
+	js, stop := newConsumer(t, handler)
+	defer stop()
 
-	if want, have := errTeapot.Error(), resp.Error; want != have {
+	publish(t, js, "test data")
+
+	if want, have := "dang", (<-resChan); want != have {
 		t.Errorf("want %s, have %s", want, have)
 	}
 }
 
-func TestSubscriberHappySubject(t *testing.T) {
-	step, response := testSubscriber(t)
-	step()
-	r := <-response
+func TestSubscriberHappyPath(t *testing.T) {
+	errChan := make(chan error, 1)
 
-	var resp TestResponse
-	err := json.Unmarshal(r.Data, &resp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	handler := natstransport.NewSubscriber(
+		func(context.Context, interface{}) (interface{}, error) { return struct{}{}, nil },
+		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
+		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
+		natstransport.SubscriberErrorHandler(transport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+			errChan <- err
+		})),
+	)
 
-	if want, have := "", resp.Error; want != have {
-		t.Errorf("want %s, have %s (%s)", want, have, r.Data)
+	js, stop := newConsumer(t, handler)
+	defer stop()
+
+	publish(t, js, "test data")
+
+	select {
+	case err := <-errChan:
+		t.Errorf("unexpected error: %v", err)
+	case <-time.After(time.Second): // expect no error
 	}
 }
 
 func TestMultipleSubscriberBefore(t *testing.T) {
-	var (
-		response = struct{ Body string }{"go eat a fly ugly\n"}
-		wg       sync.WaitGroup
-		done     = make(chan struct{})
-	)
+	errChan := make(chan error, 1)
+
 	handler := natstransport.NewSubscriber(
 		endpoint.Nop,
 		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
-		func(ctx context.Context, reply string, js jetstream.JetStream, i interface{}) error {
-			b, err := json.Marshal(response)
-			if err != nil {
-				return err
-			}
-
-			_, err = js.Publish(ctx, reply, b)
-			return err
-		},
+		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
 		natstransport.SubscriberBefore(func(ctx context.Context, m jetstream.Msg) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
@@ -154,10 +149,11 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 		}),
 		natstransport.SubscriberBefore(func(ctx context.Context, m jetstream.Msg) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
-				t.Error("Value was not set properly when multiple ServerBefores are used")
+				errChan <- errors.New("value was not set properly when multiple SubscriberBefore are used")
+			} else {
+				errChan <- nil
 			}
 
-			close(done)
 			return ctx
 		}),
 	)
@@ -165,52 +161,32 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 	js, stop := newConsumer(t, handler)
 	defer stop()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	publish(t, js, "test data")
 
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for finalizer")
+	if err := <-errChan; err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-
-	wg.Wait()
 }
 
 func TestMultipleSubscriberAfter(t *testing.T) {
-	var (
-		response = struct{ Body string }{"go eat a fly ugly\n"}
-		wg       sync.WaitGroup
-		done     = make(chan struct{})
-	)
+	errChan := make(chan error, 1)
+
 	handler := natstransport.NewSubscriber(
 		endpoint.Nop,
 		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) {
 			return struct{}{}, nil
 		},
-		func(ctx context.Context, reply string, js jetstream.JetStream, i interface{}) error {
-			b, err := json.Marshal(response)
-			if err != nil {
-				return err
-			}
-
-			_, err = js.Publish(ctx, reply, b)
-			return err
-		},
+		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
 		natstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
 		natstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
-				t.Error("Value was not set properly when multiple ServerAfters are used")
+				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
+			} else {
+				errChan <- nil
 			}
-			close(done)
+
 			return ctx
 		}),
 	)
@@ -218,71 +194,47 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 	js, stop := newConsumer(t, handler)
 	defer stop()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	publish(t, js, "test data")
 
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for finalizer")
+	if err := <-errChan; err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-
-	wg.Wait()
 }
 
 func TestSubscriberFinalizerFunc(t *testing.T) {
-	var (
-		response = struct{ Body string }{"go eat a fly ugly\n"}
-		wg       sync.WaitGroup
-		done     = make(chan struct{})
-	)
+	errChan := make(chan error, 1)
+
 	handler := natstransport.NewSubscriber(
 		endpoint.Nop,
 		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) {
 			return struct{}{}, nil
 		},
-		func(ctx context.Context, reply string, js jetstream.JetStream, i interface{}) error {
-			b, err := json.Marshal(response)
-			if err != nil {
-				return err
-			}
-
-			_, err = js.Publish(ctx, reply, b)
-			return err
-		},
+		func(ctx context.Context, reply string, js jetstream.JetStream, i interface{}) error { return nil },
+		natstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context {
+			return context.WithValue(ctx, "one", 1)
+		}),
 		natstransport.SubscriberFinalizer(func(ctx context.Context, msg jetstream.Msg) {
-			close(done)
+			if _, ok := ctx.Value("one").(int); !ok {
+				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
+			} else {
+				errChan <- nil
+			}
 		}),
 	)
 
 	js, stop := newConsumer(t, handler)
 	defer stop()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+	publish(t, js, "test data")
 
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for finalizer")
+	if err := <-errChan; err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-
-	wg.Wait()
 }
 
 func TestEncodeJSONResponse(t *testing.T) {
+	dataChan := make(chan string, 1)
+
 	handler := natstransport.NewSubscriber(
 		func(context.Context, interface{}) (interface{}, error) {
 			return struct {
@@ -293,84 +245,43 @@ func TestEncodeJSONResponse(t *testing.T) {
 		natstransport.EncodeJSONResponse,
 	)
 
-	js, stop := newConsumer(t, handler)
-	defer stop()
+	handler.HandleMessage(&jetstreamMock{dataChan: dataChan})(&jetstreamMsg{replySubject: "foo"})
 
-	_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-	if err != nil {
-		t.Fatal(err)
+	if want, have := `{"foo":"bar"}`, strings.TrimSpace(<-dataChan); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
 	}
-
-	// if want, have := `{"foo":"bar"}`, strings.TrimSpace(string(r.Data)); want != have {
-	// 	t.Errorf("Body: want %s, have %s", want, have)
-	// }
 }
 
-type responseError struct {
-	msg string
-}
+func TestDefaultErrorEncoder(t *testing.T) {
+	dataChan := make(chan string, 1)
 
-func (m responseError) Error() string {
-	return m.msg
-}
-
-func TestErrorEncoder(t *testing.T) {
-	errResp := struct {
-		Error string `json:"err"`
-	}{"oh no"}
 	handler := natstransport.NewSubscriber(
 		func(context.Context, interface{}) (interface{}, error) {
-			return nil, responseError{msg: errResp.Error}
+			return nil, errors.New("dang")
 		},
 		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
-		natstransport.EncodeJSONResponse,
+		func(ctx context.Context, s string, js jetstream.JetStream, i interface{}) error { return nil },
+		natstransport.SubscriberErrorEncoder(natstransport.DefaultErrorEncoder),
 	)
 
-	js, stop := newConsumer(t, handler)
-	defer stop()
+	handler.HandleMessage(&jetstreamMock{dataChan: dataChan})(&jetstreamMsg{replySubject: "foo"})
 
-	_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-	if err != nil {
-		t.Fatal(err)
+	if want, have := `{"err":"dang"}`, strings.TrimSpace(<-dataChan); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
 	}
-
-	// b, err := json.Marshal(errResp)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// if string(b) != string(r.Data) {
-	// 	t.Errorf("ErrorEncoder: got: %q, expected: %q", r.Data, b)
-	// }
-}
-
-type noContentResponse struct{}
-
-func TestEncodeNoContent(t *testing.T) {
-	handler := natstransport.NewSubscriber(
-		func(context.Context, interface{}) (interface{}, error) { return noContentResponse{}, nil },
-		func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
-		natstransport.EncodeJSONResponse,
-	)
-
-	js, stop := newConsumer(t, handler)
-	defer stop()
-
-	_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// if want, have := `{}`, strings.TrimSpace(string(r.Data)); want != have {
-	// 	t.Errorf("Body: want %s, have %s", want, have)
-	// }
 }
 
 func TestNoOpRequestDecoder(t *testing.T) {
+	errChan := make(chan error, 1)
+
 	handler := natstransport.NewSubscriber(
 		func(ctx context.Context, request interface{}) (interface{}, error) {
 			if request != nil {
-				t.Error("Expected nil request in endpoint when using NopRequestDecoder")
+				errChan <- errors.New("expected nil request in endpoint when using NopRequestDecoder")
+			} else {
+				errChan <- nil
 			}
+
 			return nil, nil
 		},
 		natstransport.NopRequestDecoder,
@@ -380,64 +291,9 @@ func TestNoOpRequestDecoder(t *testing.T) {
 	js, stop := newConsumer(t, handler)
 	defer stop()
 
-	_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-	if err != nil {
-		t.Fatal(err)
+	publish(t, js, "test data")
+
+	if err := <-errChan; err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-
-	// if want, have := `null`, strings.TrimSpace(string(r.Data)); want != have {
-	// 	t.Errorf("Body: want %s, have %s", want, have)
-	// }
-}
-
-func testSubscriber(t *testing.T) (step func(), resp <-chan *nats.Msg) {
-	var (
-		stepch   = make(chan bool)
-		endpoint = func(context.Context, interface{}) (interface{}, error) {
-			<-stepch
-			return struct{}{}, nil
-		}
-		response = make(chan *nats.Msg)
-		handler  = natstransport.NewSubscriber(
-			endpoint,
-			func(ctx context.Context, m jetstream.Msg) (request interface{}, err error) { return struct{}{}, nil },
-			natstransport.EncodeJSONResponse,
-			natstransport.SubscriberBefore(func(ctx context.Context, m jetstream.Msg) context.Context { return ctx }),
-			natstransport.SubscriberAfter(func(ctx context.Context, js jetstream.JetStream) context.Context { return ctx }),
-		)
-	)
-
-	go func() {
-		js, stop := newConsumer(t, handler)
-		defer stop()
-
-		_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// response <- r
-	}()
-
-	return func() { stepch <- true }, response
-}
-
-func testRequest(t *testing.T, c *nats.Conn, handler *natstransport.Subscriber) TestResponse {
-	js, stop := newConsumer(t, handler)
-	defer stop()
-
-	_, err := js.Publish(context.Background(), "testSubject", []byte("test data"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// var resp TestResponse
-	// err = json.Unmarshal(r.Data, &resp)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	// return resp
-
-	return TestResponse{}
 }
