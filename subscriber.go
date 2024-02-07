@@ -38,9 +38,11 @@ func NewSubscriber(
 		errorEncoder: DefaultErrorEncoder,
 		errorHandler: transport.NewLogErrorHandler(log.NewNopLogger()),
 	}
+
 	for _, option := range options {
 		option(s)
 	}
+
 	return s
 }
 
@@ -63,8 +65,8 @@ func SubscriberAfter(after ...SubscriberResponseFunc) SubscriberOption {
 // whenever they're encountered in the processing of a request. Clients can
 // use this to provide custom error formatting. By default,
 // errors will be published with the DefaultErrorEncoder.
-func SubscriberErrorEncoder(ee ErrorEncoder) SubscriberOption {
-	return func(s *Subscriber) { s.errorEncoder = ee }
+func SubscriberErrorEncoder(encoder ErrorEncoder) SubscriberOption {
+	return func(s *Subscriber) { s.errorEncoder = encoder }
 }
 
 // SubscriberErrorLogger is used to log non-terminal errors. By default, no errors
@@ -86,8 +88,8 @@ func SubscriberErrorHandler(errorHandler transport.ErrorHandler) SubscriberOptio
 
 // SubscriberFinalizer is executed at the end of every request from a publisher through NATS.
 // By default, no finalizer is registered.
-func SubscriberFinalizer(f ...SubscriberFinalizerFunc) SubscriberOption {
-	return func(s *Subscriber) { s.finalizer = f }
+func SubscriberFinalizer(finalizerFunc ...SubscriberFinalizerFunc) SubscriberOption {
+	return func(s *Subscriber) { s.finalizer = finalizerFunc }
 }
 
 // ServeMsg provides nats.MsgHandler.
@@ -96,10 +98,11 @@ func (s Subscriber) HandleMessage(js jetstream.JetStream) func(jetstream.Msg) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		var response any
 		if len(s.finalizer) > 0 {
 			defer func() {
 				for _, f := range s.finalizer {
-					f(ctx, msg)
+					f(ctx, msg, response)
 				}
 			}()
 		}
@@ -111,20 +114,20 @@ func (s Subscriber) HandleMessage(js jetstream.JetStream) func(jetstream.Msg) {
 		request, err := s.dec(ctx, msg)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			if msg.Reply() == "" {
-				return
+			if msg.Reply() != "" {
+				s.errorEncoder(ctx, err, msg.Reply(), js)
 			}
-			s.errorEncoder(ctx, err, msg.Reply(), js)
+
 			return
 		}
 
-		response, err := s.e(ctx, request)
+		response, err = s.e(ctx, request)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			if msg.Reply() == "" {
-				return
+			if msg.Reply() != "" {
+				s.errorEncoder(ctx, err, msg.Reply(), js)
 			}
-			s.errorEncoder(ctx, err, msg.Reply(), js)
+
 			return
 		}
 
@@ -139,6 +142,7 @@ func (s Subscriber) HandleMessage(js jetstream.JetStream) func(jetstream.Msg) {
 		if err := s.enc(ctx, msg.Reply(), js, response); err != nil {
 			s.errorHandler.Handle(ctx, err)
 			s.errorEncoder(ctx, err, msg.Reply(), js)
+
 			return
 		}
 	}
@@ -148,51 +152,57 @@ func (s Subscriber) HandleMessage(js jetstream.JetStream) func(jetstream.Msg) {
 // Users are encouraged to use custom ErrorEncoders to encode errors to
 // their replies, and will likely want to pass and check for their own error
 // types.
-type ErrorEncoder func(ctx context.Context, err error, reply string, js jetstream.JetStream)
+type ErrorEncoder func(ctx context.Context, err error, replySubject string, js jetstream.JetStream)
 
 // SubscriberFinalizerFunc can be used to perform work at the end of an request
 // from a publisher, after the response has been written to the publisher. The principal
 // intended use is for request logging.
-type SubscriberFinalizerFunc func(ctx context.Context, msg jetstream.Msg)
+type SubscriberFinalizerFunc func(ctx context.Context, msg jetstream.Msg, response any)
 
 // NopRequestDecoder is a DecodeRequestFunc that can be used for requests that do not
 // need to be decoded, and simply returns nil, nil.
-func NopRequestDecoder(context.Context, jetstream.Msg) (request interface{}, err error) {
+func NopRequestDecoder(context.Context, jetstream.Msg) (interface{}, error) {
 	return nil, nil
+}
+
+// NopResponseEncoder is a EncodeResponseFunc that can be used for responses that do not
+// need to be decoded, and simply returns nil.
+func NopResponseEncoder(context.Context, string, jetstream.JetStream, interface{}) error {
+	return nil
 }
 
 // EncodeJSONResponse is a EncodeResponseFunc that serializes the response as a
 // JSON object to the subscriber reply. Many JSON-over services can use it as
 // a sensible default.
-func EncodeJSONResponse(ctx context.Context, reply string, js jetstream.JetStream, response interface{}) error {
+func EncodeJSONResponse(ctx context.Context, replySubject string, js jetstream.JetStream, response interface{}) error {
 	b, err := json.Marshal(response)
 	if err != nil {
 		return err
 	}
 
-	_, err = js.Publish(ctx, reply, b)
+	_, err = js.Publish(ctx, replySubject, b)
+
 	return err
 }
 
 // DefaultErrorEncoder writes the error to the subscriber reply.
-func DefaultErrorEncoder(ctx context.Context, err error, reply string, js jetstream.JetStream) {
+func DefaultErrorEncoder(ctx context.Context, err error, replySubject string, js jetstream.JetStream) {
 	logger := log.NewNopLogger()
 
 	type Response struct {
 		Error string `json:"err"`
 	}
 
-	var response Response
-
-	response.Error = err.Error()
+	response := Response{Error: err.Error()}
 
 	b, err := json.Marshal(response)
 	if err != nil {
 		logger.Log("err", err)
+
 		return
 	}
 
-	if _, err := js.Publish(ctx, reply, b); err != nil {
+	if _, err := js.Publish(ctx, replySubject, b); err != nil {
 		logger.Log("err", err)
 	}
 }

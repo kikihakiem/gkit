@@ -36,9 +36,11 @@ func NewPublisher(
 		dec:       dec,
 		timeout:   10 * time.Second,
 	}
+
 	for _, option := range options {
 		option(p)
 	}
+
 	return p
 }
 
@@ -109,4 +111,16 @@ func EncodeJSONRequest(_ context.Context, msg *nats.Msg, request interface{}) er
 	msg.Data = b
 
 	return nil
+}
+
+// NopRequestEncoder is a EncodeRequestFunc that can be used for requests that do not
+// need to be decoded, and returns nil.
+func NopRequestEncoder(context.Context, *nats.Msg, interface{}) error {
+	return nil
+}
+
+// NopResponseDecoder is a DecodeResponseFunc that can be used for responses that do not
+// need to be decoded, and simply returns ack, nil.
+func NopResponseDecoder(_ context.Context, ack *jetstream.PubAck) (interface{}, error) {
+	return ack, nil
 }

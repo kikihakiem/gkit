@@ -1,8 +1,9 @@
+//go:build unit
+
 package jetstream_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -12,11 +13,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
-
-type TestResponse struct {
-	String string `json:"str"`
-	Error  string `json:"err"`
-}
 
 func newNATSConn(t *testing.T) (*server.Server, *nats.Conn) {
 	t.Helper()
@@ -54,7 +50,7 @@ func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetst
 
 	return js, stream, func() {
 		nc.Close()
-		shutdownJSServerAndRemoveStorage(t, srv)
+		shutdownJSServer(t, srv)
 	}
 }
 
@@ -65,6 +61,10 @@ func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.Jet
 	defer cancel()
 
 	js, stream, stopServer := newJetstream(ctx, t)
+	err := stream.Purge(ctx)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	consumer, err := stream.CreateOrUpdateConsumer(ctx, jetstream.ConsumerConfig{})
 	if err != nil {
@@ -82,19 +82,10 @@ func newConsumer(t *testing.T, handler *natstransport.Subscriber) (jetstream.Jet
 	}
 }
 
-func shutdownJSServerAndRemoveStorage(t *testing.T, s *server.Server) {
+func shutdownJSServer(t *testing.T, s *server.Server) {
 	t.Helper()
 
-	var sd string
-	if config := s.JetStreamConfig(); config != nil {
-		sd = config.StoreDir
-	}
 	s.Shutdown()
-	if sd != "" {
-		if err := os.RemoveAll(sd); err != nil {
-			t.Fatalf("Unable to remove storage %q: %v", sd, err)
-		}
-	}
 	s.WaitForShutdown()
 }
 
