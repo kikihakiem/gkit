@@ -17,7 +17,7 @@ type DecodeRequestFunc func(ctx context.Context, msg jetstream.Msg) (request int
 // object. It's designed to be used in NATS publishers, for publisher-side
 // endpoints. One straightforward EncodeRequestFunc could something that JSON
 // encodes the object directly to the request payload.
-type EncodeRequestFunc func(ctx context.Context, msg *nats.Msg, request interface{}) error
+type EncodeRequestFunc[Req any] func(ctx context.Context, msg *nats.Msg, request Req) error
 
 // EncodeResponseFunc encodes the passed response object to the subscriber reply.
 // It's designed to be used in NATS subscribers, for subscriber-side
@@ -29,4 +29,4 @@ type EncodeResponseFunc func(ctx context.Context, replySubject string, js jetstr
 // response object. It's designed to be used in NATS publisher, for publisher-side
 // endpoints. One straightforward DecodeResponseFunc could be something that
 // JSON decodes from the response payload to the concrete response type.
-type DecodeResponseFunc func(ctx context.Context, ack *jetstream.PubAck) (response interface{}, err error)
+type DecodeResponseFunc[Res any] func(ctx context.Context, ack *jetstream.PubAck) (response Res, err error)
