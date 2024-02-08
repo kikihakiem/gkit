@@ -9,9 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
 	jstransport "github.com/kikihakiem/jetstream-transport"
+	"github.com/kikihakiem/jetstream-transport/gkit"
 )
 
 type emptyStruct struct{}
@@ -25,10 +27,10 @@ func TestSubscriberBadDecode(t *testing.T) {
 	)
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
-		jstransport.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		reqDecoder,
-		jstransport.NopResponseEncoder,
-		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		gkit.NopResponseEncoder,
+		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -51,9 +53,9 @@ func TestSubscriberBadEndpoint(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		endpt,
-		jstransport.NopRequestDecoder,
-		jstransport.NopResponseEncoder,
-		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		gkit.NopRequestDecoder,
+		gkit.NopResponseEncoder,
+		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -70,17 +72,17 @@ func TestSubscriberBadEndpoint(t *testing.T) {
 
 func TestSubscriberBadEncode(t *testing.T) {
 	var (
-		respEncoder = func(context.Context, string, jetstream.JetStream, emptyStruct) error {
-			return errors.New("dang")
+		respEncoder = func(context.Context, emptyStruct) (*nats.Msg, error) {
+			return nil, errors.New("dang")
 		}
 		errChan = make(chan error, 1)
 	)
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
-		jstransport.NopEndpoint[emptyStruct, emptyStruct],
-		jstransport.NopRequestDecoder,
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopRequestDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -97,19 +99,23 @@ func TestSubscriberBadEncode(t *testing.T) {
 
 func TestSubscriberErrorEncoder(t *testing.T) {
 	var (
-		respEncoder = func(context.Context, string, jetstream.JetStream, emptyStruct) error {
-			return errors.New("dang")
+		respEncoder = func(context.Context, emptyStruct) (*nats.Msg, error) {
+			return nil, errors.New("dang")
 		}
 		resChan = make(chan string, 1)
 	)
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
-		jstransport.NopEndpoint[emptyStruct, emptyStruct],
-		jstransport.NopRequestDecoder,
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopRequestDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](func(ctx context.Context, err error, reply string, js jetstream.JetStream) {
-			future, _ := js.PublishAsync(reply, []byte(err.Error()))
-			resChan <- string(future.Msg().Data)
+		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](func(ctx context.Context, err error) *nats.Msg {
+			msg := nats.NewMsg("foo")
+			msg.Data = []byte(err.Error())
+			return msg
+		}),
+		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, resp *nats.Msg, err error) {
+			resChan <- string(resp.Data)
 		}),
 	)
 
@@ -135,12 +141,12 @@ func TestSubscriberHappyPath(t *testing.T) {
 		reqDecoder = func(ctx context.Context, m jetstream.Msg) (string, error) {
 			return string(m.Data()) + " foo", nil
 		}
-		respEncoder = func(ctx context.Context, s string, js jetstream.JetStream, resp string) error {
+		respEncoder = func(ctx context.Context, resp string) (*nats.Msg, error) {
 			if want, have := "test data foo bar", resp; want != have {
 				t.Errorf("want %s, have %s", want, have)
 			}
 
-			return nil
+			return nil, nil
 		}
 		errChan = make(chan error, 1)
 	)
@@ -149,7 +155,7 @@ func TestSubscriberHappyPath(t *testing.T) {
 		endpt,
 		reqDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorHandler[string, string](jstransport.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		jstransport.SubscriberErrorHandler[string, string](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
 	)
@@ -170,15 +176,15 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 	errChan := make(chan error, 1)
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
-		jstransport.NopEndpoint[emptyStruct, emptyStruct],
-		jstransport.NopRequestDecoder,
-		jstransport.NopResponseEncoder,
-		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m jetstream.Msg) context.Context {
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopRequestDecoder,
+		gkit.NopResponseEncoder,
+		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m emptyStruct) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m jetstream.Msg) context.Context {
+		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m emptyStruct) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberBefore are used")
 			} else {
@@ -201,20 +207,20 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 
 func TestMultipleSubscriberAfter(t *testing.T) {
 	var (
-		respEncoder = func(context.Context, string, jetstream.JetStream, emptyStruct) error {
-			return errors.New("dang")
+		respEncoder = func(context.Context, emptyStruct) (*nats.Msg, error) {
+			return nil, errors.New("dang")
 		}
 		errChan = make(chan error, 1)
 	)
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
-		jstransport.NopEndpoint[emptyStruct, emptyStruct],
-		jstransport.NopRequestDecoder,
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopRequestDecoder,
 		respEncoder,
-		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream) context.Context {
+		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream) context.Context {
+		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -239,13 +245,13 @@ func TestSubscriberFinalizerFunc(t *testing.T) {
 	errChan := make(chan error, 1)
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
-		jstransport.NopEndpoint[emptyStruct, emptyStruct],
-		jstransport.NopRequestDecoder,
-		jstransport.NopResponseEncoder,
-		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream) context.Context {
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopRequestDecoder,
+		gkit.NopResponseEncoder,
+		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, msg jetstream.Msg, resp emptyStruct) {
+		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, resp *nats.Msg, err error) {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -267,17 +273,25 @@ func TestSubscriberFinalizerFunc(t *testing.T) {
 func TestEncodeJSONResponse(t *testing.T) {
 	dataChan := make(chan string, 1)
 
-	handler := jstransport.NewSubscriber(
-		func(context.Context, interface{}) (interface{}, error) {
-			return struct {
-				Foo string `json:"foo"`
-			}{"bar"}, nil
+	type foo struct {
+		Foo string `json:"foo"`
+	}
+
+	handler := jstransport.NewSubscriber[emptyStruct, foo](
+		func(context.Context, emptyStruct) (foo, error) {
+			return foo{"bar"}, nil
 		},
-		jstransport.NopRequestDecoder,
+		gkit.NopRequestDecoder,
 		jstransport.EncodeJSONResponse,
+		jstransport.SubscriberFinalizer[emptyStruct, foo](func(ctx context.Context, request jetstream.Msg, response *nats.Msg, err error) {
+			dataChan <- string(response.Data)
+		}),
 	)
 
-	handler.HandleMessage(&jetstreamMock{dataChan: dataChan})(&jetstreamMsg{replySubject: "foo"})
+	js, stop := newConsumer(t, handler)
+	defer stop()
+
+	publish(t, js, "test data")
 
 	if want, have := `{"foo":"bar"}`, strings.TrimSpace(<-dataChan); want != have {
 		t.Errorf("Body: want %s, have %s", want, have)
@@ -291,14 +305,44 @@ func TestDefaultErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) {
 			return emptyStruct{}, errors.New("dang")
 		},
-		jstransport.NopRequestDecoder,
-		jstransport.NopResponseEncoder,
+		gkit.NopRequestDecoder,
+		gkit.NopResponseEncoder,
 		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](jstransport.DefaultErrorEncoder),
+		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, resp *nats.Msg, err error) {
+			dataChan <- string(resp.Data)
+		}),
 	)
 
-	handler.HandleMessage(&jetstreamMock{dataChan: dataChan})(&jetstreamMsg{replySubject: "foo"})
+	js, stop := newConsumer(t, handler)
+	defer stop()
+
+	publish(t, js, "test data")
 
 	if want, have := `{"err":"dang"}`, strings.TrimSpace(<-dataChan); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
+	}
+}
+
+func TestErrorLogger(t *testing.T) {
+	errChan := make(chan error, 1)
+
+	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+		func(context.Context, emptyStruct) (emptyStruct, error) {
+			return emptyStruct{}, errors.New("dang")
+		},
+		gkit.NopRequestDecoder,
+		gkit.NopResponseEncoder,
+		jstransport.SubscriberErrorLogger[emptyStruct, emptyStruct](func(ctx context.Context, err error) {
+			errChan <- err
+		}),
+	)
+
+	js, stop := newConsumer(t, handler)
+	defer stop()
+
+	publish(t, js, "test data")
+
+	if want, have := "dang", (<-errChan).Error(); want != have {
 		t.Errorf("Body: want %s, have %s", want, have)
 	}
 }
@@ -316,7 +360,7 @@ func TestNoOpRequestDecoder(t *testing.T) {
 
 			return nil, nil
 		},
-		jstransport.NopRequestDecoder,
+		gkit.NopRequestDecoder,
 		jstransport.EncodeJSONResponse,
 	)
 

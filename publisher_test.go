@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jstransport "github.com/kikihakiem/jetstream-transport"
+	"github.com/kikihakiem/jetstream-transport/gkit"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -18,9 +19,8 @@ func TestPublisher(t *testing.T) {
 
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
-		"natstransport.test.1",
-		jstransport.NopRequestEncoder,
-		jstransport.NopResponseDecoder,
+		jstransport.EncodeJSONRequest,
+		gkit.PassThroughResponseDecoder,
 	)
 
 	res, err := publisher.Endpoint()(context.Background(), struct{}{})
@@ -36,10 +36,11 @@ func TestPublisher(t *testing.T) {
 func TestPublisherBefore(t *testing.T) {
 	var (
 		testData   = "foobar"
-		reqEncoder = func(_ context.Context, msg *nats.Msg, req string) error {
+		reqEncoder = func(_ context.Context, req string) (*nats.Msg, error) {
+			msg := nats.NewMsg("natstransport.response")
 			msg.Data = []byte(req)
 
-			return nil
+			return msg, nil
 		}
 	)
 
@@ -48,9 +49,8 @@ func TestPublisherBefore(t *testing.T) {
 
 	publisher := jstransport.NewPublisher[string, *jetstream.PubAck](
 		js,
-		"natstransport.test.1",
 		reqEncoder,
-		jstransport.NopResponseDecoder,
+		gkit.NopResponseDecoder,
 		jstransport.PublisherBefore[string, *jetstream.PubAck](func(ctx context.Context, msg *nats.Msg) context.Context {
 			if want, have := testData, string(msg.Data); want != have {
 				t.Errorf("want %q, have %q", want, have)
@@ -73,10 +73,9 @@ func TestPublisherAfter(t *testing.T) {
 
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
-		"natstransport.test.2",
-		jstransport.NopRequestEncoder,
-		jstransport.NopResponseDecoder,
-		jstransport.PublisherAfter[struct{}, *jetstream.PubAck](func(ctx context.Context, pa *jetstream.PubAck) context.Context {
+		jstransport.EncodeJSONRequest,
+		gkit.PassThroughResponseDecoder,
+		jstransport.PublisherAfter[struct{}, *jetstream.PubAck](func(ctx context.Context, pa *jetstream.PubAck, err error) context.Context {
 			pa.Stream = alteredStreamName // alter the stream name just to check if this function is called
 			return ctx
 		}),
@@ -98,9 +97,8 @@ func TestPublisherTimeout(t *testing.T) {
 
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
-		"natstransport.test.3",
-		jstransport.NopRequestEncoder,
-		jstransport.NopResponseDecoder,
+		jstransport.EncodeJSONRequest,
+		gkit.NopResponseDecoder,
 		jstransport.PublisherTimeout[struct{}, *jetstream.PubAck](time.Nanosecond), // set a very low timeout
 	)
 
@@ -116,9 +114,8 @@ func TestPublisherCancellation(t *testing.T) {
 
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
-		"natstransport.test.4",
-		jstransport.NopRequestEncoder,
-		jstransport.NopResponseDecoder,
+		jstransport.EncodeJSONRequest,
+		gkit.NopResponseDecoder,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -138,9 +135,8 @@ func TestEncodeJSONRequest(t *testing.T) {
 
 	publisher := jstransport.NewPublisher[any, *jetstream.PubAck](
 		js,
-		"natstransport.test.5",
 		jstransport.EncodeJSONRequest,
-		jstransport.NopResponseDecoder,
+		gkit.NopResponseDecoder,
 		jstransport.PublisherBefore[any, *jetstream.PubAck](func(ctx context.Context, msg *nats.Msg) context.Context {
 			encoded <- string(msg.Data)
 			return ctx

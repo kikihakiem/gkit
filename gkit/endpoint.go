@@ -1,4 +1,4 @@
-package jetstream
+package gkit
 
 import (
 	"context"

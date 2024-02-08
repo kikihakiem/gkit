@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/kikihakiem/jetstream-transport/gkit"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -12,25 +13,22 @@ import (
 // Publisher wraps a URL and provides a method that implements endpoint.Endpoint.
 type Publisher[Req, Res any] struct {
 	publisher jetstream.JetStream
-	subject   string
-	enc       EncodeRequestFunc[Req]
-	dec       DecodeResponseFunc[Res]
-	before    []PublisherRequestFunc
-	after     []PublisherResponseFunc
+	enc       gkit.EncodeRequestFunc[Req, *nats.Msg]
+	dec       gkit.DecodeResponseFunc[*jetstream.PubAck, Res]
+	before    []gkit.BeforeRequestFunc[*nats.Msg]
+	after     []gkit.AfterResponseFunc[*jetstream.PubAck]
 	timeout   time.Duration
 }
 
 // NewPublisher constructs a usable Publisher for a single remote method.
 func NewPublisher[Req, Res any](
 	publisher jetstream.JetStream,
-	subject string,
-	enc EncodeRequestFunc[Req],
-	dec DecodeResponseFunc[Res],
+	enc gkit.EncodeRequestFunc[Req, *nats.Msg],
+	dec gkit.DecodeResponseFunc[*jetstream.PubAck, Res],
 	options ...PublisherOption[Req, Res],
 ) *Publisher[Req, Res] {
 	p := &Publisher[Req, Res]{
 		publisher: publisher,
-		subject:   subject,
 		enc:       enc,
 		dec:       dec,
 		timeout:   10 * time.Second,
@@ -48,14 +46,14 @@ type PublisherOption[Req, Res any] func(*Publisher[Req, Res])
 
 // PublisherBefore sets the PublisherRequestFuncs that are applied to the outgoing NATS
 // request before it's invoked.
-func PublisherBefore[Req, Res any](before ...PublisherRequestFunc) PublisherOption[Req, Res] {
+func PublisherBefore[Req, Res any](before ...gkit.BeforeRequestFunc[*nats.Msg]) PublisherOption[Req, Res] {
 	return func(p *Publisher[Req, Res]) { p.before = append(p.before, before...) }
 }
 
 // PublisherAfter sets the ClientResponseFuncs applied to the incoming NATS
 // request prior to it being decoded. This is useful for obtaining anything off
 // of the response and adding onto the context prior to decoding.
-func PublisherAfter[Req, Res any](after ...PublisherResponseFunc) PublisherOption[Req, Res] {
+func PublisherAfter[Req, Res any](after ...gkit.AfterResponseFunc[*jetstream.PubAck]) PublisherOption[Req, Res] {
 	return func(p *Publisher[Req, Res]) { p.after = append(p.after, after...) }
 }
 
@@ -65,17 +63,15 @@ func PublisherTimeout[Req, Res any](timeout time.Duration) PublisherOption[Req, 
 }
 
 // Endpoint returns a usable endpoint that invokes the remote endpoint.
-func (p Publisher[Req, Res]) Endpoint() Endpoint[Req, Res] {
+func (p Publisher[Req, Res]) Endpoint() gkit.Endpoint[Req, Res] {
 	return func(ctx context.Context, request Req) (Res, error) {
 		ctx, cancel := context.WithTimeout(ctx, p.timeout)
 		defer cancel()
 
-		var (
-			msg      = nats.NewMsg(p.subject)
-			response Res
-		)
+		var response Res
 
-		if err := p.enc(ctx, msg, request); err != nil {
+		msg, err := p.enc(ctx, request)
+		if err != nil {
 			return response, err
 		}
 
@@ -89,7 +85,7 @@ func (p Publisher[Req, Res]) Endpoint() Endpoint[Req, Res] {
 		}
 
 		for _, f := range p.after {
-			ctx = f(ctx, resp)
+			ctx = f(ctx, resp, err)
 		}
 
 		response, err = p.dec(ctx, resp)
@@ -104,25 +100,14 @@ func (p Publisher[Req, Res]) Endpoint() Endpoint[Req, Res] {
 // EncodeJSONRequest is an EncodeRequestFunc that serializes the request as a
 // JSON object to the Data of the Msg. Many JSON-over-NATS services can use it as
 // a sensible default.
-func EncodeJSONRequest[Req any](_ context.Context, msg *nats.Msg, request Req) error {
+func EncodeJSONRequest[In any](_ context.Context, request In) (*nats.Msg, error) {
 	b, err := json.Marshal(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	msg := nats.NewMsg("natstransport.response")
 	msg.Data = b
 
-	return nil
-}
-
-// NopRequestEncoder is a EncodeRequestFunc that can be used for requests that do not
-// need to be decoded, and returns nil.
-func NopRequestEncoder[Req any](context.Context, *nats.Msg, Req) error {
-	return nil
-}
-
-// NopResponseDecoder is a DecodeResponseFunc that can be used for responses that do not
-// need to be decoded, and simply returns ack, nil.
-func NopResponseDecoder[Res any](_ context.Context, ack Res) (Res, error) {
-	return ack, nil
+	return msg, nil
 }
