@@ -307,7 +307,7 @@ func TestDefaultErrorEncoder(t *testing.T) {
 		},
 		gkit.NopRequestDecoder,
 		gkit.NopResponseEncoder,
-		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](jstransport.DefaultErrorEncoder),
+		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](jstransport.EncodeJSONError),
 		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, resp *nats.Msg, err error) {
 			dataChan <- string(resp.Data)
 		}),

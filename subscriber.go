@@ -33,7 +33,7 @@ func NewSubscriber[Req, Res any](
 		e:            e,
 		dec:          dec,
 		enc:          enc,
-		errorEncoder: DefaultErrorEncoder,
+		errorEncoder: EncodeJSONError,
 		errorHandler: gkit.LogErrorHandler(nil),
 	}
 
@@ -101,8 +101,10 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 
 		if len(s.finalizer) > 0 {
 			defer func() {
-				for _, f := range s.finalizer {
-					f(ctx, msg, reply, err)
+				if msg.Reply() != "" {
+					for _, f := range s.finalizer {
+						f(ctx, msg, reply, err)
+					}
 				}
 
 				if err != nil {
@@ -116,9 +118,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		request, err := s.dec(ctx, msg)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			if msg.Reply() != "" {
-				reply = s.errorEncoder(ctx, err)
-			}
+			reply = s.errorEncoder(ctx, err)
 
 			return
 		}
@@ -130,19 +130,13 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		response, err = s.e(ctx, request)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			if msg.Reply() != "" {
-				reply = s.errorEncoder(ctx, err)
-			}
+			reply = s.errorEncoder(ctx, err)
 
 			return
 		}
 
 		for _, f := range s.after {
 			ctx = f(ctx, response, err)
-		}
-
-		if msg.Reply() == "" {
-			return
 		}
 
 		reply, err = s.enc(ctx, response)
@@ -174,8 +168,8 @@ type ErrResponse struct {
 	Error string `json:"err"`
 }
 
-// DefaultErrorEncoder writes the error to the subscriber reply.
-func DefaultErrorEncoder(ctx context.Context, err error) *nats.Msg {
+// EncodeJSONError writes the error to the subscriber reply.
+func EncodeJSONError(ctx context.Context, err error) *nats.Msg {
 	response := ErrResponse{Error: err.Error()}
 
 	b, err := json.Marshal(response)
