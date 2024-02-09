@@ -25,7 +25,7 @@ func NewPublisher[Req, Res any](
 	publisher jetstream.JetStream,
 	enc gkit.EncodeRequestFunc[Req, *nats.Msg],
 	dec gkit.DecodeResponseFunc[*jetstream.PubAck, Res],
-	options ...PublisherOption[Req, Res],
+	options ...gkit.Option[*Publisher[Req, Res]],
 ) *Publisher[Req, Res] {
 	p := &Publisher[Req, Res]{
 		publisher: publisher,
@@ -41,24 +41,21 @@ func NewPublisher[Req, Res any](
 	return p
 }
 
-// PublisherOption sets an optional parameter for clients.
-type PublisherOption[Req, Res any] func(*Publisher[Req, Res])
-
 // PublisherBefore sets the PublisherRequestFuncs that are applied to the outgoing NATS
 // request before it's invoked.
-func PublisherBefore[Req, Res any](before ...gkit.BeforeRequestFunc[*nats.Msg]) PublisherOption[Req, Res] {
+func PublisherBefore[Req, Res any](before ...gkit.BeforeRequestFunc[*nats.Msg]) gkit.Option[*Publisher[Req, Res]] {
 	return func(p *Publisher[Req, Res]) { p.before = append(p.before, before...) }
 }
 
 // PublisherAfter sets the ClientResponseFuncs applied to the incoming NATS
 // request prior to it being decoded. This is useful for obtaining anything off
 // of the response and adding onto the context prior to decoding.
-func PublisherAfter[Req, Res any](after ...gkit.AfterResponseFunc[*jetstream.PubAck]) PublisherOption[Req, Res] {
+func PublisherAfter[Req, Res any](after ...gkit.AfterResponseFunc[*jetstream.PubAck]) gkit.Option[*Publisher[Req, Res]] {
 	return func(p *Publisher[Req, Res]) { p.after = append(p.after, after...) }
 }
 
 // PublisherTimeout sets the available timeout for NATS request.
-func PublisherTimeout[Req, Res any](timeout time.Duration) PublisherOption[Req, Res] {
+func PublisherTimeout[Req, Res any](timeout time.Duration) gkit.Option[*Publisher[Req, Res]] {
 	return func(p *Publisher[Req, Res]) { p.timeout = timeout }
 }
 

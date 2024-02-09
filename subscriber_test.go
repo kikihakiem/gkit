@@ -351,7 +351,7 @@ func TestNoOpRequestDecoder(t *testing.T) {
 	errChan := make(chan error, 1)
 
 	handler := jstransport.NewSubscriber(
-		func(ctx context.Context, request interface{}) (interface{}, error) {
+		func(ctx context.Context, request any) (any, error) {
 			if request != nil {
 				errChan <- errors.New("expected nil request in endpoint when using NopRequestDecoder")
 			} else {

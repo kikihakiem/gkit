@@ -144,7 +144,7 @@ func TestEncodeJSONRequest(t *testing.T) {
 	).Endpoint()
 
 	for _, test := range []struct {
-		value interface{}
+		value any
 		body  string
 	}{
 		{nil, "null"},

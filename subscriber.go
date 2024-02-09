@@ -27,7 +27,7 @@ func NewSubscriber[Req, Res any](
 	e gkit.Endpoint[Req, Res],
 	dec gkit.DecodeRequestFunc[jetstream.Msg, Req],
 	enc gkit.EncodeResponseFunc[Res, *nats.Msg],
-	options ...SubscriberOption[Req, Res],
+	options ...gkit.Option[*Subscriber[Req, Res]],
 ) *Subscriber[Req, Res] {
 	s := &Subscriber[Req, Res]{
 		e:            e,
@@ -44,18 +44,15 @@ func NewSubscriber[Req, Res any](
 	return s
 }
 
-// SubscriberOption sets an optional parameter for subscribers.
-type SubscriberOption[Req, Res any] func(*Subscriber[Req, Res])
-
 // SubscriberBefore functions are executed on the publisher request object before the
 // request is decoded.
-func SubscriberBefore[Req, Res any](before ...gkit.BeforeRequestFunc[Req]) SubscriberOption[Req, Res] {
+func SubscriberBefore[Req, Res any](before ...gkit.BeforeRequestFunc[Req]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.before = append(s.before, before...) }
 }
 
 // SubscriberAfter functions are executed on the subscriber reply after the
 // endpoint is invoked, but before anything is published to the reply.
-func SubscriberAfter[Req, Res any](after ...gkit.AfterResponseFunc[Res]) SubscriberOption[Req, Res] {
+func SubscriberAfter[Req, Res any](after ...gkit.AfterResponseFunc[Res]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.after = append(s.after, after...) }
 }
 
@@ -63,7 +60,7 @@ func SubscriberAfter[Req, Res any](after ...gkit.AfterResponseFunc[Res]) Subscri
 // whenever they're encountered in the processing of a request. Clients can
 // use this to provide custom error formatting. By default,
 // errors will be published with the DefaultErrorEncoder.
-func SubscriberErrorEncoder[Req, Res any](encoder gkit.ErrorEncoder[*nats.Msg]) SubscriberOption[Req, Res] {
+func SubscriberErrorEncoder[Req, Res any](encoder gkit.ErrorEncoder[*nats.Msg]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.errorEncoder = encoder }
 }
 
@@ -72,7 +69,7 @@ func SubscriberErrorEncoder[Req, Res any](encoder gkit.ErrorEncoder[*nats.Msg]) 
 // of error handling, including logging in more detail, should be performed in a
 // custom SubscriberErrorEncoder which has access to the context.
 // Deprecated: Use SubscriberErrorHandler instead.
-func SubscriberErrorLogger[Req, Res any](logger gkit.LogFunc) SubscriberOption[Req, Res] {
+func SubscriberErrorLogger[Req, Res any](logger gkit.LogFunc) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.errorHandler = gkit.LogErrorHandler(logger) }
 }
 
@@ -80,13 +77,13 @@ func SubscriberErrorLogger[Req, Res any](logger gkit.LogFunc) SubscriberOption[R
 // are ignored. This is intended as a diagnostic measure. Finer-grained control
 // of error handling, including logging in more detail, should be performed in a
 // custom SubscriberErrorEncoder which has access to the context.
-func SubscriberErrorHandler[Req, Res any](errorHandler gkit.ErrorHandler) SubscriberOption[Req, Res] {
+func SubscriberErrorHandler[Req, Res any](errorHandler gkit.ErrorHandler) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.errorHandler = errorHandler }
 }
 
 // SubscriberFinalizer is executed at the end of every request from a publisher through NATS.
 // By default, no finalizer is registered.
-func SubscriberFinalizer[Req, Res any](finalizerFunc ...gkit.FinalizerFunc[jetstream.Msg, *nats.Msg]) SubscriberOption[Req, Res] {
+func SubscriberFinalizer[Req, Res any](finalizerFunc ...gkit.FinalizerFunc[jetstream.Msg, *nats.Msg]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.finalizer = finalizerFunc }
 }
 
@@ -106,6 +103,12 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 			defer func() {
 				for _, f := range s.finalizer {
 					f(ctx, msg, reply, err)
+				}
+
+				if err != nil {
+					msg.Nak()
+				} else {
+					msg.Ack()
 				}
 			}()
 		}
