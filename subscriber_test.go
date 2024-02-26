@@ -29,7 +29,7 @@ func TestSubscriberBadDecode(t *testing.T) {
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		reqDecoder,
-		gkit.NopResponseEncoder,
+		gkit.NopEncoderDecoder,
 		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
@@ -53,8 +53,8 @@ func TestSubscriberBadEndpoint(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		endpt,
-		gkit.NopRequestDecoder,
-		gkit.NopResponseEncoder,
+		gkit.NopEncoderDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
 		})),
@@ -80,7 +80,7 @@ func TestSubscriberBadEncode(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
-		gkit.NopRequestDecoder,
+		gkit.NopEncoderDecoder,
 		respEncoder,
 		jstransport.SubscriberErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			errChan <- err
@@ -107,7 +107,7 @@ func TestSubscriberErrorEncoder(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
-		gkit.NopRequestDecoder,
+		gkit.NopEncoderDecoder,
 		respEncoder,
 		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](func(ctx context.Context, err error) *nats.Msg {
 			msg := nats.NewMsg("foo")
@@ -177,8 +177,8 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
-		gkit.NopRequestDecoder,
-		gkit.NopResponseEncoder,
+		gkit.NopEncoderDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m emptyStruct) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
@@ -215,7 +215,7 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
-		gkit.NopRequestDecoder,
+		gkit.NopEncoderDecoder,
 		respEncoder,
 		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			return context.WithValue(ctx, "one", 1)
@@ -246,8 +246,8 @@ func TestSubscriberFinalizerFunc(t *testing.T) {
 
 	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
-		gkit.NopRequestDecoder,
-		gkit.NopResponseEncoder,
+		gkit.NopEncoderDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
@@ -281,7 +281,7 @@ func TestEncodeJSONResponse(t *testing.T) {
 		func(context.Context, emptyStruct) (foo, error) {
 			return foo{"bar"}, nil
 		},
-		gkit.NopRequestDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.EncodeJSONResponse,
 		jstransport.SubscriberFinalizer[emptyStruct, foo](func(ctx context.Context, request jetstream.Msg, response *nats.Msg, err error) {
 			dataChan <- string(response.Data)
@@ -305,8 +305,8 @@ func TestDefaultErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) {
 			return emptyStruct{}, errors.New("dang")
 		},
-		gkit.NopRequestDecoder,
-		gkit.NopResponseEncoder,
+		gkit.NopEncoderDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](jstransport.EncodeJSONError),
 		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, resp *nats.Msg, err error) {
 			dataChan <- string(resp.Data)
@@ -330,8 +330,8 @@ func TestErrorLogger(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) {
 			return emptyStruct{}, errors.New("dang")
 		},
-		gkit.NopRequestDecoder,
-		gkit.NopResponseEncoder,
+		gkit.NopEncoderDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.SubscriberErrorLogger[emptyStruct, emptyStruct](func(ctx context.Context, err error) {
 			errChan <- err
 		}),
@@ -360,7 +360,7 @@ func TestNoOpRequestDecoder(t *testing.T) {
 
 			return nil, nil
 		},
-		gkit.NopRequestDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.EncodeJSONResponse,
 	)
 

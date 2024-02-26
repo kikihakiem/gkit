@@ -12,8 +12,8 @@ import (
 // Subscriber wraps an endpoint and provides nats.MsgHandler.
 type Subscriber[Req, Res any] struct {
 	e            gkit.Endpoint[Req, Res]
-	dec          gkit.DecodeRequestFunc[jetstream.Msg, Req]
-	enc          gkit.EncodeResponseFunc[Res, *nats.Msg]
+	dec          gkit.EncodeDecodeFunc[jetstream.Msg, Req]
+	enc          gkit.EncodeDecodeFunc[Res, *nats.Msg]
 	before       []gkit.BeforeRequestFunc[Req]
 	after        []gkit.AfterResponseFunc[Res]
 	errorEncoder gkit.ErrorEncoder[*nats.Msg]
@@ -25,8 +25,8 @@ type Subscriber[Req, Res any] struct {
 // the provided endpoint.
 func NewSubscriber[Req, Res any](
 	e gkit.Endpoint[Req, Res],
-	dec gkit.DecodeRequestFunc[jetstream.Msg, Req],
-	enc gkit.EncodeResponseFunc[Res, *nats.Msg],
+	dec gkit.EncodeDecodeFunc[jetstream.Msg, Req],
+	enc gkit.EncodeDecodeFunc[Res, *nats.Msg],
 	options ...gkit.Option[*Subscriber[Req, Res]],
 ) *Subscriber[Req, Res] {
 	s := &Subscriber[Req, Res]{

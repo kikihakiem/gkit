@@ -13,8 +13,8 @@ import (
 // Publisher wraps a URL and provides a method that implements endpoint.Endpoint.
 type Publisher[Req, Res any] struct {
 	publisher jetstream.JetStream
-	enc       gkit.EncodeRequestFunc[Req, *nats.Msg]
-	dec       gkit.DecodeResponseFunc[*jetstream.PubAck, Res]
+	enc       gkit.EncodeDecodeFunc[Req, *nats.Msg]
+	dec       gkit.EncodeDecodeFunc[*jetstream.PubAck, Res]
 	before    []gkit.BeforeRequestFunc[*nats.Msg]
 	after     []gkit.AfterResponseFunc[*jetstream.PubAck]
 	timeout   time.Duration
@@ -23,8 +23,8 @@ type Publisher[Req, Res any] struct {
 // NewPublisher constructs a usable Publisher for a single remote method.
 func NewPublisher[Req, Res any](
 	publisher jetstream.JetStream,
-	enc gkit.EncodeRequestFunc[Req, *nats.Msg],
-	dec gkit.DecodeResponseFunc[*jetstream.PubAck, Res],
+	enc gkit.EncodeDecodeFunc[Req, *nats.Msg],
+	dec gkit.EncodeDecodeFunc[*jetstream.PubAck, Res],
 	options ...gkit.Option[*Publisher[Req, Res]],
 ) *Publisher[Req, Res] {
 	p := &Publisher[Req, Res]{

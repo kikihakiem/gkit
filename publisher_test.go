@@ -20,7 +20,7 @@ func TestPublisher(t *testing.T) {
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
 		jstransport.EncodeJSONRequest,
-		gkit.PassThroughResponseDecoder,
+		gkit.PassThroughEncoderDecoder,
 	)
 
 	res, err := publisher.Endpoint()(context.Background(), struct{}{})
@@ -50,7 +50,7 @@ func TestPublisherBefore(t *testing.T) {
 	publisher := jstransport.NewPublisher[string, *jetstream.PubAck](
 		js,
 		reqEncoder,
-		gkit.NopResponseDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.PublisherBefore[string, *jetstream.PubAck](func(ctx context.Context, msg *nats.Msg) context.Context {
 			if want, have := testData, string(msg.Data); want != have {
 				t.Errorf("want %q, have %q", want, have)
@@ -74,7 +74,7 @@ func TestPublisherAfter(t *testing.T) {
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
 		jstransport.EncodeJSONRequest,
-		gkit.PassThroughResponseDecoder,
+		gkit.PassThroughEncoderDecoder,
 		jstransport.PublisherAfter[struct{}, *jetstream.PubAck](func(ctx context.Context, pa *jetstream.PubAck, err error) context.Context {
 			pa.Stream = alteredStreamName // alter the stream name just to check if this function is called
 			return ctx
@@ -98,7 +98,7 @@ func TestPublisherTimeout(t *testing.T) {
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
 		jstransport.EncodeJSONRequest,
-		gkit.NopResponseDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.PublisherTimeout[struct{}, *jetstream.PubAck](time.Nanosecond), // set a very low timeout
 	)
 
@@ -115,7 +115,7 @@ func TestPublisherCancellation(t *testing.T) {
 	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
 		jstransport.EncodeJSONRequest,
-		gkit.NopResponseDecoder,
+		gkit.NopEncoderDecoder,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -136,7 +136,7 @@ func TestEncodeJSONRequest(t *testing.T) {
 	publisher := jstransport.NewPublisher[any, *jetstream.PubAck](
 		js,
 		jstransport.EncodeJSONRequest,
-		gkit.NopResponseDecoder,
+		gkit.NopEncoderDecoder,
 		jstransport.PublisherBefore[any, *jetstream.PubAck](func(ctx context.Context, msg *nats.Msg) context.Context {
 			encoded <- string(msg.Data)
 			return ctx
