@@ -10,11 +10,10 @@ import (
 
 type versatileWriter struct {
 	http.ResponseWriter
-	closeNotifyCalled bool
-	hijackCalled      bool
-	readFromCalled    bool
-	pushCalled        bool
-	flushCalled       bool
+	hijackCalled   bool
+	readFromCalled bool
+	pushCalled     bool
+	flushCalled    bool
 }
 
 func (v *versatileWriter) Flush() { v.flushCalled = true }
@@ -22,11 +21,12 @@ func (v *versatileWriter) Push(target string, opts *http.PushOptions) error {
 	v.pushCalled = true
 	return nil
 }
+
 func (v *versatileWriter) ReadFrom(r io.Reader) (n int64, err error) {
 	v.readFromCalled = true
 	return 0, nil
 }
-func (v *versatileWriter) CloseNotify() <-chan bool { v.closeNotifyCalled = true; return nil }
+
 func (v *versatileWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	v.hijackCalled = true
 	return nil, nil, nil
@@ -37,7 +37,6 @@ func TestInterceptingWriter_passthroughs(t *testing.T) {
 	iw := (&interceptingWriter{ResponseWriter: w}).reimplementInterfaces()
 	iw.(http.Flusher).Flush()
 	iw.(http.Pusher).Push("", nil)
-	iw.(http.CloseNotifier).CloseNotify()
 	iw.(http.Hijacker).Hijack()
 	iw.(io.ReaderFrom).ReadFrom(nil)
 
@@ -46,9 +45,6 @@ func TestInterceptingWriter_passthroughs(t *testing.T) {
 	}
 	if !w.pushCalled {
 		t.Error("Push not called")
-	}
-	if !w.closeNotifyCalled {
-		t.Error("CloseNotify not called")
 	}
 	if !w.hijackCalled {
 		t.Error("Hijack not called")
@@ -72,9 +68,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -103,9 +96,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != false {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != false {
 			t.Error("unexpected interface")
 		}
@@ -130,9 +120,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -162,9 +149,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != false {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != false {
 			t.Error("unexpected interface")
 		}
@@ -189,9 +173,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -221,9 +202,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != false {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != true {
 			t.Error("unexpected interface")
 		}
@@ -249,9 +227,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -282,9 +257,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != false {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != true {
 			t.Error("unexpected interface")
 		}
@@ -299,19 +271,15 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 9/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier")
+		t.Log("http.ResponseWriter")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
 		if _, ok := w.(http.ResponseWriter); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -328,10 +296,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 10/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, http.Pusher")
+		t.Log("http.ResponseWriter, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			http.Pusher
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
@@ -339,9 +306,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -358,10 +322,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 11/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, io.ReaderFrom")
+		t.Log("http.ResponseWriter, io.ReaderFrom")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			io.ReaderFrom
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
@@ -369,9 +332,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -388,10 +348,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 12/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, io.ReaderFrom, http.Pusher")
+		t.Log("http.ResponseWriter, io.ReaderFrom, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			io.ReaderFrom
 			http.Pusher
 		}{}
@@ -400,9 +359,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -419,10 +375,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 13/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, http.Hijacker")
+		t.Log("http.ResponseWriter, http.Hijacker")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			http.Hijacker
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
@@ -430,9 +385,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -449,10 +401,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 14/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, http.Hijacker, http.Pusher")
+		t.Log("http.ResponseWriter, http.Hijacker, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			http.Hijacker
 			http.Pusher
 		}{}
@@ -461,9 +412,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -480,10 +428,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 15/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, http.Hijacker, io.ReaderFrom")
+		t.Log("http.ResponseWriter, http.Hijacker, io.ReaderFrom")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			http.Hijacker
 			io.ReaderFrom
 		}{}
@@ -492,9 +439,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -511,10 +455,9 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 16/32
 	{
-		t.Log("http.ResponseWriter, http.CloseNotifier, http.Hijacker, io.ReaderFrom, http.Pusher")
+		t.Log("http.ResponseWriter, http.Hijacker, io.ReaderFrom, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
-			http.CloseNotifier
 			http.Hijacker
 			io.ReaderFrom
 			http.Pusher
@@ -524,9 +467,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -553,9 +493,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -585,9 +522,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != true {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != false {
 			t.Error("unexpected interface")
 		}
@@ -613,9 +547,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -646,9 +577,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != true {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != false {
 			t.Error("unexpected interface")
 		}
@@ -674,9 +602,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -707,9 +632,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != true {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != true {
 			t.Error("unexpected interface")
 		}
@@ -736,9 +658,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -770,9 +689,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 		if _, ok := w.(http.Flusher); ok != true {
 			t.Error("unexpected interface")
 		}
-		if _, ok := w.(http.CloseNotifier); ok != false {
-			t.Error("unexpected interface")
-		}
 		if _, ok := w.(http.Hijacker); ok != true {
 			t.Error("unexpected interface")
 		}
@@ -787,20 +703,16 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 25/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier")
+		t.Log("http.ResponseWriter, http.Flusher")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
 		if _, ok := w.(http.ResponseWriter); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -817,11 +729,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 26/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, http.Pusher")
+		t.Log("http.ResponseWriter, http.Flusher, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			http.Pusher
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
@@ -829,9 +740,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -848,11 +756,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 27/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, io.ReaderFrom")
+		t.Log("http.ResponseWriter, http.Flusher, io.ReaderFrom")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			io.ReaderFrom
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
@@ -860,9 +767,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -879,11 +783,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 28/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, io.ReaderFrom, http.Pusher")
+		t.Log("http.ResponseWriter, http.Flusher, io.ReaderFrom, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			io.ReaderFrom
 			http.Pusher
 		}{}
@@ -892,9 +795,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != false {
@@ -911,11 +811,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 29/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, http.Hijacker")
+		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			http.Hijacker
 		}{}
 		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
@@ -923,9 +822,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -942,11 +838,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 30/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, http.Hijacker, http.Pusher")
+		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			http.Hijacker
 			http.Pusher
 		}{}
@@ -955,9 +850,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -974,11 +866,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 31/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, http.Hijacker, io.ReaderFrom")
+		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, io.ReaderFrom")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			http.Hijacker
 			io.ReaderFrom
 		}{}
@@ -987,9 +878,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
@@ -1006,11 +894,10 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	// combination 32/32
 	{
-		t.Log("http.ResponseWriter, http.Flusher, http.CloseNotifier, http.Hijacker, io.ReaderFrom, http.Pusher")
+		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, io.ReaderFrom, http.Pusher")
 		inner := struct {
 			http.ResponseWriter
 			http.Flusher
-			http.CloseNotifier
 			http.Hijacker
 			io.ReaderFrom
 			http.Pusher
@@ -1020,9 +907,6 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.CloseNotifier); ok != true {
 			t.Error("unexpected interface")
 		}
 		if _, ok := w.(http.Hijacker); ok != true {
