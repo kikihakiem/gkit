@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	jstransport "github.com/kikihakiem/jetstream-transport"
-	"github.com/kikihakiem/jetstream-transport/gkit"
+	gkit "github.com/kikihakiem/gkit/core"
+	jstransport "github.com/kikihakiem/gkit/transport/jetstream"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -37,7 +37,7 @@ func TestPublisherBefore(t *testing.T) {
 	var (
 		testData   = "foobar"
 		reqEncoder = func(_ context.Context, req string) (*nats.Msg, error) {
-			msg := nats.NewMsg("natstransport.response")
+			msg := nats.NewMsg("jstransport.response")
 			msg.Data = []byte(req)
 
 			return msg, nil

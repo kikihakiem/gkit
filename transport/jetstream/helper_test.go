@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	natstransport "github.com/kikihakiem/jetstream-transport"
+	jstransport "github.com/kikihakiem/gkit/transport/jetstream"
 	"github.com/nats-io/nats-server/v2/server"
 	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
@@ -42,7 +42,7 @@ func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetst
 
 	stream, err := js.CreateStream(ctx, jetstream.StreamConfig{
 		Name:     "test:stream",
-		Subjects: []string{"natstransport.>"},
+		Subjects: []string{"jstransport.>"},
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -54,7 +54,7 @@ func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetst
 	}
 }
 
-func newConsumer[Req, Res any](t *testing.T, handler *natstransport.Subscriber[Req, Res]) (jetstream.JetStream, func()) {
+func newConsumer[Req, Res any](t *testing.T, handler *jstransport.Subscriber[Req, Res]) (jetstream.JetStream, func()) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -90,7 +90,7 @@ func shutdownJSServer(t *testing.T, s *server.Server) {
 }
 
 func publish(t *testing.T, js jetstream.JetStream, message string) {
-	_, err := js.Publish(context.Background(), "natstransport.test.99", []byte(message))
+	_, err := js.Publish(context.Background(), "jstransport.test.99", []byte(message))
 	if err != nil {
 		t.Fatal(err)
 	}

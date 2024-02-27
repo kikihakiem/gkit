@@ -12,8 +12,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	jstransport "github.com/kikihakiem/jetstream-transport"
-	"github.com/kikihakiem/jetstream-transport/gkit"
+	gkit "github.com/kikihakiem/gkit/core"
+	jstransport "github.com/kikihakiem/gkit/transport/jetstream"
 )
 
 type emptyStruct struct{}

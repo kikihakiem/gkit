@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/kikihakiem/jetstream-transport/gkit"
+	gkit "github.com/kikihakiem/gkit/core"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
@@ -103,7 +103,7 @@ func EncodeJSONRequest[In any](_ context.Context, request In) (*nats.Msg, error)
 		return nil, err
 	}
 
-	msg := nats.NewMsg("natstransport.response")
+	msg := nats.NewMsg("jstransport.response")
 	msg.Data = b
 
 	return msg, nil
