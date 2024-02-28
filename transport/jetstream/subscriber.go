@@ -14,7 +14,7 @@ type Subscriber[Req, Res any] struct {
 	e            gkit.Endpoint[Req, Res]
 	dec          gkit.EncodeDecodeFunc[jetstream.Msg, Req]
 	enc          gkit.ResponseEncoder[jetstream.JetStream, Res]
-	before       []gkit.BeforeRequestFunc[Req]
+	before       []gkit.BeforeRequestFunc[jetstream.Msg]
 	after        []gkit.AfterResponseFunc[Res]
 	errorEncoder gkit.ErrorEncoder[jetstream.JetStream]
 	finalizer    []gkit.FinalizerFunc[jetstream.Msg]
@@ -46,7 +46,7 @@ func NewSubscriber[Req, Res any](
 
 // SubscriberBefore functions are executed on the publisher request object before the
 // request is decoded.
-func SubscriberBefore[Req, Res any](before ...gkit.BeforeRequestFunc[Req]) gkit.Option[*Subscriber[Req, Res]] {
+func SubscriberBefore[Req, Res any](before ...gkit.BeforeRequestFunc[jetstream.Msg]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.before = append(s.before, before...) }
 }
 
@@ -107,11 +107,15 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 				}
 
 				if err != nil {
-					msg.Nak()
+					msg.Nak() //nolint:errcheck
 				} else {
-					msg.Ack()
+					msg.Ack() //nolint:errcheck
 				}
 			}()
+		}
+
+		for _, f := range s.before {
+			ctx = f(ctx, msg)
 		}
 
 		request, err := s.dec(ctx, msg)
@@ -120,10 +124,6 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 			s.errorEncoder(ctx, js, err)
 
 			return
-		}
-
-		for _, f := range s.before {
-			ctx = f(ctx, request)
 		}
 
 		response, err = s.e(ctx, request)
@@ -160,9 +160,9 @@ func EncodeJSONResponse[Res any](ctx context.Context, js jetstream.JetStream, re
 	msg := nats.NewMsg("foo")
 	msg.Data = b
 
-	js.PublishMsg(ctx, msg)
+	_, err = js.PublishMsg(ctx, msg)
 
-	return nil
+	return err
 }
 
 type ErrResponse struct {
@@ -181,5 +181,5 @@ func EncodeJSONError(ctx context.Context, js jetstream.JetStream, err error) {
 	msg := nats.NewMsg("foo")
 	msg.Data = b
 
-	js.PublishMsg(ctx, msg)
+	js.PublishMsg(ctx, msg) //nolint:errcheck
 }
