@@ -173,12 +173,12 @@ func TestMultipleSubscriberBefore(t *testing.T) {
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		gkit.NopResponseEncoder,
-		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m emptyStruct) context.Context {
+		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, _ jetstream.Msg) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, m emptyStruct) context.Context {
+		jstransport.SubscriberBefore[emptyStruct, emptyStruct](func(ctx context.Context, _ jetstream.Msg) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberBefore are used")
 			} else {
