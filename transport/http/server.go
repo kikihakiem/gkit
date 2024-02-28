@@ -205,7 +205,7 @@ func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
 		code = sc.StatusCode()
 	}
 	w.WriteHeader(code)
-	w.Write(body)
+	w.Write(body) //nolint:errcheck
 }
 
 // StatusCoder is checked by DefaultErrorEncoder. If an error value implements
