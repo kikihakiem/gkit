@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"io"
 	"net/http"
 	"net/url"
@@ -179,21 +178,6 @@ func EncodeJSONRequest[Req any](c context.Context, r *http.Request, request Req)
 	r.Body = io.NopCloser(&b)
 	return json.NewEncoder(&b).Encode(request)
 }
-
-// EncodeXMLRequest is an EncodeRequestFunc that serializes the request as a
-// XML object to the Request body. TODO: If the request implements Headerer,
-// the provided headers will be applied to the request.
-func EncodeXMLRequest[Req any](c context.Context, r *http.Request, request Req) error {
-	r.Header.Set("Content-Type", "text/xml; charset=utf-8")
-
-	var b bytes.Buffer
-	r.Body = io.NopCloser(&b)
-	return xml.NewEncoder(&b).Encode(request)
-}
-
-//
-//
-//
 
 func makeCreateRequestFunc[Req any](method string, target *url.URL, enc EncodeRequestFunc[Req]) gkit.EncodeDecodeFunc[Req, *http.Request] {
 	return func(ctx context.Context, request Req) (*http.Request, error) {

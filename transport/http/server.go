@@ -64,16 +64,6 @@ func ServerErrorEncoder[Req, Res any](ee gkit.ErrorEncoder[http.ResponseWriter])
 	return func(s *Server[Req, Res]) { s.errorEncoder = ee }
 }
 
-// ServerErrorLogger is used to log non-terminal errors. By default, no errors
-// are logged. This is intended as a diagnostic measure. Finer-grained control
-// of error handling, including logging in more detail, should be performed in a
-// custom ServerErrorEncoder or ServerFinalizer, both of which have access to
-// the context.
-// Deprecated: Use ServerErrorHandler instead.
-func ServerErrorLogger[Req, Res any](fn gkit.LogFunc) ServerOption[Req, Res] {
-	return func(s *Server[Req, Res]) { s.errorHandler = gkit.LogErrorHandler(fn) }
-}
-
 // ServerErrorHandler is used to handle non-terminal errors. By default, non-terminal errors
 // are ignored. This is intended as a diagnostic measure. Finer-grained control
 // of error handling, including logging in more detail, should be performed in a

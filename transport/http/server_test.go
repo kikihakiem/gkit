@@ -80,6 +80,25 @@ func TestServerErrorEncoder(t *testing.T) {
 	}
 }
 
+func TestServerErrorHandler(t *testing.T) {
+	errTeapot := errors.New("teapot")
+	msgChan := make(chan string, 1)
+	handler := httptransport.NewServer[emptyStruct, emptyStruct](
+		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
+		func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
+		func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
+		httptransport.ServerErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
+			msgChan <- err.Error()
+		})),
+	)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	http.Get(server.URL)
+	if want, have := errTeapot.Error(), <-msgChan; want != have {
+		t.Errorf("want %s, have %s", want, have)
+	}
+}
+
 func TestServerHappyPath(t *testing.T) {
 	step, response := testServer(t)
 	step()

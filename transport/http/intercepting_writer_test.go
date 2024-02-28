@@ -1,3 +1,5 @@
+//go:build unit
+
 package http
 
 import (
@@ -57,7 +59,7 @@ func TestInterceptingWriter_passthroughs(t *testing.T) {
 // TestInterceptingWriter_reimplementInterfaces is also derived from
 // https://github.com/felixge/httpsnoop, like interceptingWriter.
 func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
-	// combination 1/32
+	// combination 1/16
 	{
 		t.Log("http.ResponseWriter")
 		inner := struct {
@@ -82,7 +84,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 2/32
+	// combination 2/16
 	{
 		t.Log("http.ResponseWriter, http.Pusher")
 		inner := struct {
@@ -108,7 +110,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 3/32
+	// combination 3/16
 	{
 		t.Log("http.ResponseWriter, io.ReaderFrom")
 		inner := struct {
@@ -134,7 +136,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 4/32
+	// combination 4/16
 	{
 		t.Log("http.ResponseWriter, io.ReaderFrom, http.Pusher")
 		inner := struct {
@@ -161,7 +163,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 5/32
+	// combination 5/16
 	{
 		t.Log("http.ResponseWriter, http.Hijacker")
 		inner := struct {
@@ -187,7 +189,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 6/32
+	// combination 6/16
 	{
 		t.Log("http.ResponseWriter, http.Hijacker, http.Pusher")
 		inner := struct {
@@ -214,7 +216,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 7/32
+	// combination 7/16
 	{
 		t.Log("http.ResponseWriter, http.Hijacker, io.ReaderFrom")
 		inner := struct {
@@ -241,7 +243,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 8/32
+	// combination 8/16
 	{
 		t.Log("http.ResponseWriter, http.Hijacker, io.ReaderFrom, http.Pusher")
 		inner := struct {
@@ -269,219 +271,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 9/32
-	{
-		t.Log("http.ResponseWriter")
-		inner := struct {
-			http.ResponseWriter
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 10/32
-	{
-		t.Log("http.ResponseWriter, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 11/32
-	{
-		t.Log("http.ResponseWriter, io.ReaderFrom")
-		inner := struct {
-			http.ResponseWriter
-			io.ReaderFrom
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 12/32
-	{
-		t.Log("http.ResponseWriter, io.ReaderFrom, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			io.ReaderFrom
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 13/32
-	{
-		t.Log("http.ResponseWriter, http.Hijacker")
-		inner := struct {
-			http.ResponseWriter
-			http.Hijacker
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 14/32
-	{
-		t.Log("http.ResponseWriter, http.Hijacker, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Hijacker
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 15/32
-	{
-		t.Log("http.ResponseWriter, http.Hijacker, io.ReaderFrom")
-		inner := struct {
-			http.ResponseWriter
-			http.Hijacker
-			io.ReaderFrom
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 16/32
-	{
-		t.Log("http.ResponseWriter, http.Hijacker, io.ReaderFrom, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Hijacker
-			io.ReaderFrom
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 17/32
+	// combination 9/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher")
 		inner := struct {
@@ -507,7 +297,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 18/32
+	// combination 10/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, http.Pusher")
 		inner := struct {
@@ -534,7 +324,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 19/32
+	// combination 11/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, io.ReaderFrom")
 		inner := struct {
@@ -561,7 +351,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 20/32
+	// combination 12/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, io.ReaderFrom, http.Pusher")
 		inner := struct {
@@ -589,7 +379,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 21/32
+	// combination 13/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker")
 		inner := struct {
@@ -616,7 +406,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 22/32
+	// combination 14/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, http.Pusher")
 		inner := struct {
@@ -644,7 +434,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 23/32
+	// combination 15/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, io.ReaderFrom")
 		inner := struct {
@@ -672,227 +462,7 @@ func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
 
 	}
 
-	// combination 24/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, io.ReaderFrom, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-			io.ReaderFrom
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 25/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 26/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 27/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, io.ReaderFrom")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			io.ReaderFrom
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 28/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, io.ReaderFrom, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			io.ReaderFrom
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 29/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 30/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, http.Pusher")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-			http.Pusher
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != false {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != true {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 31/32
-	{
-		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, io.ReaderFrom")
-		inner := struct {
-			http.ResponseWriter
-			http.Flusher
-			http.Hijacker
-			io.ReaderFrom
-		}{}
-		w := (&interceptingWriter{ResponseWriter: inner}).reimplementInterfaces()
-		if _, ok := w.(http.ResponseWriter); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Flusher); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Hijacker); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(io.ReaderFrom); ok != true {
-			t.Error("unexpected interface")
-		}
-		if _, ok := w.(http.Pusher); ok != false {
-			t.Error("unexpected interface")
-		}
-
-	}
-
-	// combination 32/32
+	// combination 16/16
 	{
 		t.Log("http.ResponseWriter, http.Flusher, http.Hijacker, io.ReaderFrom, http.Pusher")
 		inner := struct {
