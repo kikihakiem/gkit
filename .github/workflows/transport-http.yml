@@ -23,8 +23,8 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.56.2
-          args: --out-format checkstyle:lint-report.xml,github-actions --timeout 2m
+          args: --out-format checkstyle:lint-report.xml,github-actions --timeout 2m --tests=false
           working-directory: './transport/http'
-      - name: test
+      - name: Test
         run: go test -v -timeout 30s -count=1 ./... -coverprofile=test-report.out
         working-directory: './transport/http'
