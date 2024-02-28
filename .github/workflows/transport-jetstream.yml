@@ -1,10 +1,10 @@
-name: HTTP
+name: Jetstream
 on:
   pull_request:
     # branches:
     #   - main
     paths:
-      - 'transport/http/**'
+      - 'transport/jetstream/**'
 
 jobs:
   quality-check:
@@ -24,7 +24,7 @@ jobs:
         with:
           version: v1.56.2
           args: --out-format checkstyle:lint-report.xml,github-actions --timeout 2m --tests=false
-          working-directory: './transport/http'
+          working-directory: './transport/jetstream'
       - name: Test
         run: go test --tags=unit -v -timeout 30s -count=1 ./... -coverprofile=test-report.out
-        working-directory: './transport/http'
+        working-directory: './transport/jetstream'
