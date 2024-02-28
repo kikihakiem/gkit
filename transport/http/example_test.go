@@ -10,17 +10,17 @@ import (
 )
 
 func ExamplePopulateRequestContext() {
-	handler := httptransport.NewServer(
-		func(ctx context.Context, request interface{}) (response interface{}, err error) {
+	handler := httptransport.NewServer[struct{}, struct{}](
+		func(ctx context.Context, request struct{}) (response struct{}, err error) {
 			fmt.Println("Method", ctx.Value(httptransport.ContextKeyRequestMethod).(string))
 			fmt.Println("RequestPath", ctx.Value(httptransport.ContextKeyRequestPath).(string))
 			fmt.Println("RequestURI", ctx.Value(httptransport.ContextKeyRequestURI).(string))
 			fmt.Println("X-Request-ID", ctx.Value(httptransport.ContextKeyRequestXRequestID).(string))
 			return struct{}{}, nil
 		},
-		func(context.Context, *http.Request) (interface{}, error) { return struct{}{}, nil },
-		func(context.Context, http.ResponseWriter, interface{}) error { return nil },
-		httptransport.ServerBefore(httptransport.PopulateRequestContext),
+		func(context.Context, *http.Request) (struct{}, error) { return struct{}{}, nil },
+		func(context.Context, http.ResponseWriter, struct{}) error { return nil },
+		httptransport.ServerBefore[struct{}, struct{}](httptransport.PopulateRequestContext),
 	)
 
 	server := httptest.NewServer(handler)

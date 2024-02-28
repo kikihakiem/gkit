@@ -21,7 +21,7 @@ type EncodeRequestFunc[Req any] func(context.Context, *http.Request, Req) error
 // writer. It's designed to be used in HTTP servers, for server-side
 // endpoints. One straightforward EncodeResponseFunc could be something that
 // JSON encodes the object directly to the response body.
-type EncodeResponseFunc func(context.Context, http.ResponseWriter, interface{}) error
+type EncodeResponseFunc[Res any] func(context.Context, http.ResponseWriter, Res) error
 
 // DecodeResponseFunc extracts a user-domain response object from an HTTP
 // response object. It's designed to be used in HTTP clients, for client-side
