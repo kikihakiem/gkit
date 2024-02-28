@@ -5,37 +5,35 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-kit/kit/endpoint"
-	"github.com/go-kit/kit/transport"
-	"github.com/go-kit/log"
+	gkit "github.com/kikihakiem/gkit/core"
 )
 
 // Server wraps an endpoint and implements http.Handler.
-type Server struct {
-	e            endpoint.Endpoint
-	dec          DecodeRequestFunc
-	enc          EncodeResponseFunc
-	before       []RequestFunc
-	after        []ServerResponseFunc
-	errorEncoder ErrorEncoder
+type Server[Req, Res any] struct {
+	e            gkit.Endpoint[Req, Res]
+	dec          gkit.EncodeDecodeFunc[*http.Request, Req]
+	enc          EncodeResponseFunc[Res]
+	before       []gkit.BeforeRequestFunc[*http.Request]
+	after        []gkit.AfterResponseFunc[http.ResponseWriter]
+	errorEncoder gkit.ErrorEncoder[http.ResponseWriter]
 	finalizer    []ServerFinalizerFunc
-	errorHandler transport.ErrorHandler
+	errorHandler gkit.ErrorHandler
 }
 
 // NewServer constructs a new server, which implements http.Handler and wraps
 // the provided endpoint.
-func NewServer(
-	e endpoint.Endpoint,
-	dec DecodeRequestFunc,
-	enc EncodeResponseFunc,
-	options ...ServerOption,
-) *Server {
-	s := &Server{
+func NewServer[Req, Res any](
+	e gkit.Endpoint[Req, Res],
+	dec gkit.EncodeDecodeFunc[*http.Request, Req],
+	enc EncodeResponseFunc[Res],
+	options ...ServerOption[Req, Res],
+) *Server[Req, Res] {
+	s := &Server[Req, Res]{
 		e:            e,
 		dec:          dec,
 		enc:          enc,
 		errorEncoder: DefaultErrorEncoder,
-		errorHandler: transport.NewLogErrorHandler(log.NewNopLogger()),
+		errorHandler: gkit.LogErrorHandler(nil),
 	}
 	for _, option := range options {
 		option(s)
@@ -44,36 +42,26 @@ func NewServer(
 }
 
 // ServerOption sets an optional parameter for servers.
-type ServerOption func(*Server)
+type ServerOption[Req, Res any] gkit.Option[*Server[Req, Res]]
 
 // ServerBefore functions are executed on the HTTP request object before the
 // request is decoded.
-func ServerBefore(before ...RequestFunc) ServerOption {
-	return func(s *Server) { s.before = append(s.before, before...) }
+func ServerBefore[Req, Res any](before ...gkit.BeforeRequestFunc[*http.Request]) ServerOption[Req, Res] {
+	return func(s *Server[Req, Res]) { s.before = append(s.before, before...) }
 }
 
 // ServerAfter functions are executed on the HTTP response writer after the
 // endpoint is invoked, but before anything is written to the client.
-func ServerAfter(after ...ServerResponseFunc) ServerOption {
-	return func(s *Server) { s.after = append(s.after, after...) }
+func ServerAfter[Req, Res any](after ...gkit.AfterResponseFunc[http.ResponseWriter]) ServerOption[Req, Res] {
+	return func(s *Server[Req, Res]) { s.after = append(s.after, after...) }
 }
 
 // ServerErrorEncoder is used to encode errors to the http.ResponseWriter
 // whenever they're encountered in the processing of a request. Clients can
 // use this to provide custom error formatting and response codes. By default,
 // errors will be written with the DefaultErrorEncoder.
-func ServerErrorEncoder(ee ErrorEncoder) ServerOption {
-	return func(s *Server) { s.errorEncoder = ee }
-}
-
-// ServerErrorLogger is used to log non-terminal errors. By default, no errors
-// are logged. This is intended as a diagnostic measure. Finer-grained control
-// of error handling, including logging in more detail, should be performed in a
-// custom ServerErrorEncoder or ServerFinalizer, both of which have access to
-// the context.
-// Deprecated: Use ServerErrorHandler instead.
-func ServerErrorLogger(logger log.Logger) ServerOption {
-	return func(s *Server) { s.errorHandler = transport.NewLogErrorHandler(logger) }
+func ServerErrorEncoder[Req, Res any](ee gkit.ErrorEncoder[http.ResponseWriter]) ServerOption[Req, Res] {
+	return func(s *Server[Req, Res]) { s.errorEncoder = ee }
 }
 
 // ServerErrorHandler is used to handle non-terminal errors. By default, non-terminal errors
@@ -81,18 +69,18 @@ func ServerErrorLogger(logger log.Logger) ServerOption {
 // of error handling, including logging in more detail, should be performed in a
 // custom ServerErrorEncoder or ServerFinalizer, both of which have access to
 // the context.
-func ServerErrorHandler(errorHandler transport.ErrorHandler) ServerOption {
-	return func(s *Server) { s.errorHandler = errorHandler }
+func ServerErrorHandler[Req, Res any](errorHandler gkit.ErrorHandler) ServerOption[Req, Res] {
+	return func(s *Server[Req, Res]) { s.errorHandler = errorHandler }
 }
 
 // ServerFinalizer is executed at the end of every HTTP request.
 // By default, no finalizer is registered.
-func ServerFinalizer(f ...ServerFinalizerFunc) ServerOption {
-	return func(s *Server) { s.finalizer = append(s.finalizer, f...) }
+func ServerFinalizer[Req, Res any](f ...ServerFinalizerFunc) ServerOption[Req, Res] {
+	return func(s *Server[Req, Res]) { s.finalizer = append(s.finalizer, f...) }
 }
 
 // ServeHTTP implements http.Handler.
-func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if len(s.finalizer) > 0 {
@@ -114,24 +102,24 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	request, err := s.dec(ctx, r)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, err, w)
+		s.errorEncoder(ctx, w, err)
 		return
 	}
 
 	response, err := s.e(ctx, request)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, err, w)
+		s.errorEncoder(ctx, w, err)
 		return
 	}
 
 	for _, f := range s.after {
-		ctx = f(ctx, w)
+		ctx = f(ctx, w, err)
 	}
 
 	if err := s.enc(ctx, w, response); err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, err, w)
+		s.errorEncoder(ctx, w, err)
 		return
 	}
 }
@@ -187,7 +175,7 @@ func EncodeJSONResponse(_ context.Context, w http.ResponseWriter, response inter
 // the marshaling succeeds, a content type of application/json and the JSON
 // encoded form of the error will be used. If the error implements StatusCoder,
 // the provided StatusCode will be used instead of 500.
-func DefaultErrorEncoder(_ context.Context, err error, w http.ResponseWriter) {
+func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
 	contentType, body := "text/plain; charset=utf-8", []byte(err.Error())
 	if marshaler, ok := err.(json.Marshaler); ok {
 		if jsonBody, marshalErr := marshaler.MarshalJSON(); marshalErr == nil {
@@ -207,7 +195,7 @@ func DefaultErrorEncoder(_ context.Context, err error, w http.ResponseWriter) {
 		code = sc.StatusCode()
 	}
 	w.WriteHeader(code)
-	w.Write(body)
+	w.Write(body) //nolint:errcheck
 }
 
 // StatusCoder is checked by DefaultErrorEncoder. If an error value implements
