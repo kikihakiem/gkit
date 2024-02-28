@@ -6,7 +6,7 @@ import (
 )
 
 // FinalizerFunc can be used to perform work at the end of a request.
-type FinalizerFunc[Req, Res any] func(ctx context.Context, request Req, response Res, err error)
+type FinalizerFunc[Req any] func(ctx context.Context, request Req, err error)
 
 // ErrorHandler receives a transport error to be processed for diagnostic purposes.
 // Usually this means logging the error.

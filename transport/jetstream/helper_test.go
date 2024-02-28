@@ -40,7 +40,7 @@ func newJetstream(ctx context.Context, t *testing.T) (jetstream.JetStream, jetst
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	stream, err := js.CreateStream(ctx, jetstream.StreamConfig{
+	stream, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:     "test:stream",
 		Subjects: []string{"jstransport.>"},
 	})
@@ -94,4 +94,14 @@ func publish(t *testing.T, js jetstream.JetStream, message string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+type jetstreamMock struct {
+	jetstream.JetStream
+	dataChan chan string
+}
+
+func (jm *jetstreamMock) PublishMsg(_ context.Context, msg *nats.Msg, _ ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
+	jm.dataChan <- string(msg.Data)
+	return nil, nil
 }

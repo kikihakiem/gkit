@@ -13,11 +13,11 @@ import (
 type Subscriber[Req, Res any] struct {
 	e            gkit.Endpoint[Req, Res]
 	dec          gkit.EncodeDecodeFunc[jetstream.Msg, Req]
-	enc          gkit.EncodeDecodeFunc[Res, *nats.Msg]
+	enc          gkit.ResponseEncoder[jetstream.JetStream, Res]
 	before       []gkit.BeforeRequestFunc[Req]
 	after        []gkit.AfterResponseFunc[Res]
-	errorEncoder gkit.ErrorEncoder[*nats.Msg]
-	finalizer    []gkit.FinalizerFunc[jetstream.Msg, *nats.Msg]
+	errorEncoder gkit.ErrorEncoder[jetstream.JetStream]
+	finalizer    []gkit.FinalizerFunc[jetstream.Msg]
 	errorHandler gkit.ErrorHandler
 }
 
@@ -26,7 +26,7 @@ type Subscriber[Req, Res any] struct {
 func NewSubscriber[Req, Res any](
 	e gkit.Endpoint[Req, Res],
 	dec gkit.EncodeDecodeFunc[jetstream.Msg, Req],
-	enc gkit.EncodeDecodeFunc[Res, *nats.Msg],
+	enc gkit.ResponseEncoder[jetstream.JetStream, Res],
 	options ...gkit.Option[*Subscriber[Req, Res]],
 ) *Subscriber[Req, Res] {
 	s := &Subscriber[Req, Res]{
@@ -60,7 +60,7 @@ func SubscriberAfter[Req, Res any](after ...gkit.AfterResponseFunc[Res]) gkit.Op
 // whenever they're encountered in the processing of a request. Clients can
 // use this to provide custom error formatting. By default,
 // errors will be published with the DefaultErrorEncoder.
-func SubscriberErrorEncoder[Req, Res any](encoder gkit.ErrorEncoder[*nats.Msg]) gkit.Option[*Subscriber[Req, Res]] {
+func SubscriberErrorEncoder[Req, Res any](encoder gkit.ErrorEncoder[jetstream.JetStream]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.errorEncoder = encoder }
 }
 
@@ -83,7 +83,7 @@ func SubscriberErrorHandler[Req, Res any](errorHandler gkit.ErrorHandler) gkit.O
 
 // SubscriberFinalizer is executed at the end of every request from a publisher through NATS.
 // By default, no finalizer is registered.
-func SubscriberFinalizer[Req, Res any](finalizerFunc ...gkit.FinalizerFunc[jetstream.Msg, *nats.Msg]) gkit.Option[*Subscriber[Req, Res]] {
+func SubscriberFinalizer[Req, Res any](finalizerFunc ...gkit.FinalizerFunc[jetstream.Msg]) gkit.Option[*Subscriber[Req, Res]] {
 	return func(s *Subscriber[Req, Res]) { s.finalizer = finalizerFunc }
 }
 
@@ -96,14 +96,13 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		var (
 			response Res
 			err      error
-			reply    *nats.Msg
 		)
 
 		if len(s.finalizer) > 0 {
 			defer func() {
 				if msg.Reply() != "" {
 					for _, f := range s.finalizer {
-						f(ctx, msg, reply, err)
+						f(ctx, msg, err)
 					}
 				}
 
@@ -118,7 +117,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		request, err := s.dec(ctx, msg)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			reply = s.errorEncoder(ctx, err)
+			s.errorEncoder(ctx, js, err)
 
 			return
 		}
@@ -130,7 +129,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		response, err = s.e(ctx, request)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			reply = s.errorEncoder(ctx, err)
+			s.errorEncoder(ctx, js, err)
 
 			return
 		}
@@ -139,10 +138,10 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 			ctx = f(ctx, response, err)
 		}
 
-		reply, err = s.enc(ctx, response)
+		err = s.enc(ctx, js, response)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			reply = s.errorEncoder(ctx, err)
+			s.errorEncoder(ctx, js, err)
 
 			return
 		}
@@ -152,16 +151,18 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 // EncodeJSONResponse is a EncodeResponseFunc that serializes the response as a
 // JSON object to the subscriber reply. Many JSON-over services can use it as
 // a sensible default.
-func EncodeJSONResponse[In any](ctx context.Context, response In) (*nats.Msg, error) {
+func EncodeJSONResponse[Res any](ctx context.Context, js jetstream.JetStream, response Res) error {
 	b, err := json.Marshal(response)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	msg := nats.NewMsg("foo")
 	msg.Data = b
 
-	return msg, nil
+	js.PublishMsg(ctx, msg)
+
+	return nil
 }
 
 type ErrResponse struct {
@@ -169,16 +170,16 @@ type ErrResponse struct {
 }
 
 // EncodeJSONError writes the error to the subscriber reply.
-func EncodeJSONError(ctx context.Context, err error) *nats.Msg {
+func EncodeJSONError(ctx context.Context, js jetstream.JetStream, err error) {
 	response := ErrResponse{Error: err.Error()}
 
 	b, err := json.Marshal(response)
 	if err != nil {
-		return nil
+		return
 	}
 
 	msg := nats.NewMsg("foo")
 	msg.Data = b
 
-	return msg
+	js.PublishMsg(ctx, msg)
 }
