@@ -210,15 +210,15 @@ func TestEncodeJSONRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	client := httptransport.NewClient[any, any](
+	client := httptransport.NewClient[any](
 		"POST",
 		serverURL,
 		httptransport.EncodeJSONRequest,
-		func(context.Context, *http.Response) (interface{}, error) { return nil, nil },
+		func(context.Context, *http.Response) (any, error) { return nil, nil },
 	).Endpoint()
 
 	for _, test := range []struct {
-		value interface{}
+		value any
 		body  string
 	}{
 		{nil, "null\n"},
@@ -241,7 +241,7 @@ func TestEncodeJSONRequest(t *testing.T) {
 
 func TestSetClient(t *testing.T) {
 	var (
-		encode = func(context.Context, *http.Request, interface{}) error { return nil }
+		encode = func(context.Context, *http.Request, any) error { return nil }
 		decode = func(_ context.Context, r *http.Response) (string, error) {
 			t, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -282,12 +282,12 @@ func TestNewExplicitClient(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	req := func(ctx context.Context, request interface{}) (*http.Request, error) {
+	req := func(ctx context.Context, request any) (*http.Request, error) {
 		req, _ := http.NewRequest("POST", srv.URL, strings.NewReader(request.(string)))
 		return req, nil
 	}
 
-	dec := func(_ context.Context, resp *http.Response) (response interface{}, err error) {
+	dec := func(_ context.Context, resp *http.Response) (response any, err error) {
 		buf, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return string(buf), err
