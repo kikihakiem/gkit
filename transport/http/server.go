@@ -137,10 +137,17 @@ type ErrorEncoder func(ctx context.Context, err error, w http.ResponseWriter)
 // provided in the context under keys with the ContextKeyResponse prefix.
 type ServerFinalizerFunc func(ctx context.Context, code int, r *http.Request)
 
-// NopRequestDecoder is a DecodeRequestFunc that can be used for requests that do not
-// need to be decoded, and simply returns nil, nil.
-func NopRequestDecoder(ctx context.Context, r *http.Request) (interface{}, error) {
-	return nil, nil
+// DecodeJSONRequest is a DecodeRequestFunc that deserialize JSON to domain object.
+func DecodeJSONRequest[Req any](_ context.Context, r *http.Request) (Req, error) {
+	var req Req
+	defer r.Body.Close()
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		return req, err
+	}
+
+	return req, nil
 }
 
 // EncodeJSONResponse is a EncodeResponseFunc that serializes the response as a
