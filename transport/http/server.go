@@ -145,26 +145,13 @@ func NopRequestDecoder(ctx context.Context, r *http.Request) (interface{}, error
 
 // EncodeJSONResponse is a EncodeResponseFunc that serializes the response as a
 // JSON object to the ResponseWriter. Many JSON-over-HTTP services can use it as
-// a sensible default. If the response implements Headerer, the provided headers
+// a sensible default. TODO: If the response implements Headerer, the provided headers
 // will be applied to the response. If the response implements StatusCoder, the
 // provided StatusCode will be used instead of 200.
-func EncodeJSONResponse(_ context.Context, w http.ResponseWriter, response interface{}) error {
+func EncodeJSONResponse[Res any](_ context.Context, w http.ResponseWriter, response Res) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if headerer, ok := response.(Headerer); ok {
-		for k, values := range headerer.Headers() {
-			for _, v := range values {
-				w.Header().Add(k, v)
-			}
-		}
-	}
-	code := http.StatusOK
-	if sc, ok := response.(StatusCoder); ok {
-		code = sc.StatusCode()
-	}
-	w.WriteHeader(code)
-	if code == http.StatusNoContent {
-		return nil
-	}
+	w.WriteHeader(http.StatusOK)
+
 	return json.NewEncoder(w).Encode(response)
 }
 
