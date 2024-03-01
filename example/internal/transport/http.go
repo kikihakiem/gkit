@@ -6,33 +6,28 @@ import (
 	"github.com/go-chi/chi/v5"
 	gkit "github.com/kikihakiem/gkit/core"
 	"github.com/kikihakiem/gkit/example/internal/audit"
-	"github.com/kikihakiem/gkit/example/internal/repository"
 	httptransport "github.com/kikihakiem/gkit/transport/http"
 )
 
-func createEventHTTPHandler(eventRepo *repository.EventRepository) http.Handler {
-	svc := audit.NewEventService(eventRepo)
-
+func createEventHTTPHandler(eventSvc *audit.EventService) http.Handler {
 	return httptransport.NewServer(
-		svc.CreateEvent,
+		eventSvc.CreateEvent,
 		httptransport.DecodeJSONRequest,
 		httptransport.EncodeJSONResponse,
 	)
 }
 
-func getEventsHTTPHandler(eventRepo *repository.EventRepository) http.Handler {
-	svc := audit.NewEventService(eventRepo)
-
+func getEventsHTTPHandler(eventSvc *audit.EventService) http.Handler {
 	return httptransport.NewServer(
-		svc.GetList,
+		eventSvc.GetList,
 		gkit.NopEncoderDecoder,
 		httptransport.EncodeJSONResponse,
 	)
 }
 
-func EventRoutes(eventRepo *repository.EventRepository) func(r chi.Router) {
+func EventRoutes(eventSvc *audit.EventService) func(r chi.Router) {
 	return func(r chi.Router) {
-		r.Method(http.MethodPost, "/", createEventHTTPHandler(eventRepo))
-		r.Method(http.MethodGet, "/", getEventsHTTPHandler(eventRepo))
+		r.Method(http.MethodPost, "/", createEventHTTPHandler(eventSvc))
+		r.Method(http.MethodGet, "/", getEventsHTTPHandler(eventSvc))
 	}
 }
