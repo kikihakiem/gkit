@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 
@@ -98,21 +99,19 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 			err      error
 		)
 
-		if len(s.finalizer) > 0 {
-			defer func() {
-				if msg.Reply() != "" {
-					for _, f := range s.finalizer {
-						f(ctx, msg, err)
-					}
+		defer func() {
+			if msg.Reply() != "" {
+				for _, f := range s.finalizer {
+					f(ctx, msg, err)
 				}
+			}
 
-				if err != nil {
-					msg.Nak() //nolint:errcheck
-				} else {
-					msg.Ack() //nolint:errcheck
-				}
-			}()
-		}
+			if err != nil {
+				msg.Nak() //nolint:errcheck
+			} else {
+				msg.Ack() //nolint:errcheck
+			}
+		}()
 
 		for _, f := range s.before {
 			ctx = f(ctx, msg)
@@ -146,6 +145,18 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 			return
 		}
 	}
+}
+
+// DecodeJSONRequest is a DecodeRequestFunc that deserialize JSON to domain object.
+func DecodeJSONRequest[Req any](_ context.Context, msg jetstream.Msg) (Req, error) {
+	var req Req
+
+	err := json.NewDecoder(bytes.NewReader(msg.Data())).Decode(&req)
+	if err != nil {
+		return req, err
+	}
+
+	return req, nil
 }
 
 // EncodeJSONResponse is a EncodeResponseFunc that serializes the response as a

@@ -25,7 +25,7 @@ func PassThroughEncoderDecoder[In any](_ context.Context, request In) (In, error
 }
 
 // NopResponseEncoder does nothing.
-func NopResponseEncoder[Res, RespWriter any](context.Context, Res, RespWriter) error {
+func NopResponseEncoder[Res, RespWriter any](context.Context, RespWriter, Res) error {
 	return nil
 }
 
