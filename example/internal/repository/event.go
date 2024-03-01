@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"os"
-
 	"github.com/kikihakiem/gkit/example/internal/audit"
 	"github.com/nokusukun/bingo"
 )
@@ -16,7 +14,7 @@ type Event struct {
 	audit.Event
 }
 
-func NewEventRepositroy() (*EventRepository, func()) {
+func NewEventRepositroy() *EventRepository {
 	driver, err := bingo.NewDriver(bingo.DriverConfiguration{
 		Filename: "events.db",
 	})
@@ -25,10 +23,8 @@ func NewEventRepositroy() (*EventRepository, func()) {
 	}
 
 	return &EventRepository{
-			db: bingo.CollectionFrom[Event](driver, "events"),
-		}, func() {
-			os.Remove("events.db")
-		}
+		db: bingo.CollectionFrom[Event](driver, "events"),
+	}
 }
 
 func (e *EventRepository) Create(event audit.Event) (id string, err error) {

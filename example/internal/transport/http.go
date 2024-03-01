@@ -10,7 +10,7 @@ import (
 	httptransport "github.com/kikihakiem/gkit/transport/http"
 )
 
-func createEventHandler(eventRepo *repository.EventRepository) http.Handler {
+func createEventHTTPHandler(eventRepo *repository.EventRepository) http.Handler {
 	svc := audit.NewEventService(eventRepo)
 
 	return httptransport.NewServer(
@@ -20,7 +20,7 @@ func createEventHandler(eventRepo *repository.EventRepository) http.Handler {
 	)
 }
 
-func getEventsHandler(eventRepo *repository.EventRepository) http.Handler {
+func getEventsHTTPHandler(eventRepo *repository.EventRepository) http.Handler {
 	svc := audit.NewEventService(eventRepo)
 
 	return httptransport.NewServer(
@@ -32,7 +32,7 @@ func getEventsHandler(eventRepo *repository.EventRepository) http.Handler {
 
 func EventRoutes(eventRepo *repository.EventRepository) func(r chi.Router) {
 	return func(r chi.Router) {
-		r.Method(http.MethodPost, "/", createEventHandler(eventRepo))
-		r.Method(http.MethodGet, "/", getEventsHandler(eventRepo))
+		r.Method(http.MethodPost, "/", createEventHTTPHandler(eventRepo))
+		r.Method(http.MethodGet, "/", getEventsHTTPHandler(eventRepo))
 	}
 }

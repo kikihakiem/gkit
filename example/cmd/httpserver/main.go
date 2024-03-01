@@ -10,8 +10,7 @@ import (
 )
 
 func main() {
-	eventRepo, stop := repository.NewEventRepositroy()
-	defer stop()
+	eventRepo := repository.NewEventRepositroy()
 
 	r := chi.NewRouter()
 	r.Route("/api/v1/events", transport.EventRoutes(eventRepo))
