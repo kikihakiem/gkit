@@ -35,3 +35,5 @@ func CreateUserEndpoint(ctx context.Context, req interface{}) (interface{}, erro
 	return response, nil
 }
 ```
+
+Please check the [example](/example) for more examples.
