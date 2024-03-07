@@ -66,7 +66,7 @@ func TestServerErrorEncoder(t *testing.T) {
 		}
 		return http.StatusInternalServerError
 	}
-	handler := httptransport.NewServer[emptyStruct, emptyStruct](
+	handler := httptransport.NewServer(
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
@@ -83,7 +83,7 @@ func TestServerErrorEncoder(t *testing.T) {
 func TestServerErrorHandler(t *testing.T) {
 	errTeapot := errors.New("teapot")
 	msgChan := make(chan string, 1)
-	handler := httptransport.NewServer[emptyStruct, emptyStruct](
+	handler := httptransport.NewServer(
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
@@ -118,7 +118,7 @@ func TestMultipleServerBefore(t *testing.T) {
 		responseBody = "go eat a fly ugly\n"
 		done         = make(chan emptyStruct)
 	)
-	handler := httptransport.NewServer[emptyStruct, emptyStruct](
+	handler := httptransport.NewServer(
 		gkit.NopEndpoint,
 		func(context.Context, *http.Request) (emptyStruct, error) {
 			return emptyStruct{}, nil
@@ -163,7 +163,7 @@ func TestMultipleServerAfter(t *testing.T) {
 		responseBody = "go eat a fly ugly\n"
 		done         = make(chan emptyStruct)
 	)
-	handler := httptransport.NewServer[emptyStruct, emptyStruct](
+	handler := httptransport.NewServer(
 		gkit.NopEndpoint,
 		func(context.Context, *http.Request) (emptyStruct, error) {
 			return emptyStruct{}, nil
@@ -208,7 +208,7 @@ func TestServerFinalizer(t *testing.T) {
 		responseBody = "go eat a fly ugly\n"
 		done         = make(chan emptyStruct)
 	)
-	handler := httptransport.NewServer[emptyStruct, emptyStruct](
+	handler := httptransport.NewServer(
 		gkit.NopEndpoint,
 		func(context.Context, *http.Request) (emptyStruct, error) {
 			return emptyStruct{}, nil
@@ -412,7 +412,7 @@ func testServer(t *testing.T) (step func(), resp <-chan *http.Response) {
 		stepch   = make(chan bool)
 		endpoint = func(context.Context, emptyStruct) (emptyStruct, error) { <-stepch; return emptyStruct{}, nil }
 		response = make(chan *http.Response)
-		handler  = httptransport.NewServer[emptyStruct, emptyStruct](
+		handler  = httptransport.NewServer(
 			endpoint,
 			func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },

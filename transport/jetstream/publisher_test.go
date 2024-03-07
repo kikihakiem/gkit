@@ -17,7 +17,7 @@ func TestPublisher(t *testing.T) {
 	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
-	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
+	publisher := jstransport.NewPublisher[struct{}](
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.PassThroughEncoderDecoder,
@@ -47,7 +47,7 @@ func TestPublisherBefore(t *testing.T) {
 	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
-	publisher := jstransport.NewPublisher[string, *jetstream.PubAck](
+	publisher := jstransport.NewPublisher(
 		js,
 		reqEncoder,
 		gkit.NopEncoderDecoder,
@@ -71,7 +71,7 @@ func TestPublisherAfter(t *testing.T) {
 	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
-	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
+	publisher := jstransport.NewPublisher(
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.PassThroughEncoderDecoder,
@@ -95,7 +95,7 @@ func TestPublisherTimeout(t *testing.T) {
 	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
-	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
+	publisher := jstransport.NewPublisher(
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.NopEncoderDecoder,
@@ -133,7 +133,7 @@ func TestEncodeJSONRequest(t *testing.T) {
 	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
-	publisher := jstransport.NewPublisher[any, *jetstream.PubAck](
+	publisher := jstransport.NewPublisher(
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.NopEncoderDecoder,

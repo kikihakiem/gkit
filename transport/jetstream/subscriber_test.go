@@ -25,7 +25,7 @@ func TestSubscriberBadDecode(t *testing.T) {
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		reqDecoder,
 		gkit.NopResponseEncoder,
@@ -50,7 +50,7 @@ func TestSubscriberBadEndpoint(t *testing.T) {
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		endpt,
 		gkit.NopEncoderDecoder,
 		gkit.NopResponseEncoder,
@@ -77,7 +77,7 @@ func TestSubscriberBadEncode(t *testing.T) {
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		respEncoder,
@@ -104,7 +104,7 @@ func TestSubscriberErrorEncoder(t *testing.T) {
 		resChan = make(chan string, 1)
 	)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		respEncoder,
@@ -145,7 +145,7 @@ func TestSubscriberHappyPath(t *testing.T) {
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber[string, string](
+	handler := jstransport.NewSubscriber(
 		endpt,
 		reqDecoder,
 		respEncoder,
@@ -169,7 +169,7 @@ func TestSubscriberHappyPath(t *testing.T) {
 func TestMultipleSubscriberBefore(t *testing.T) {
 	errChan := make(chan error, 1)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		gkit.NopResponseEncoder,
@@ -207,14 +207,14 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 		errChan = make(chan error, 1)
 	)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		respEncoder,
-		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -238,11 +238,11 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 func TestSubscriberFinalizerFunc(t *testing.T) {
 	errChan := make(chan error, 1)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		gkit.NopResponseEncoder,
-		jstransport.SubscriberAfter[emptyStruct, emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
 		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, err error) {
@@ -291,7 +291,7 @@ func TestEncodeJSONError(t *testing.T) {
 func TestErrorLogger(t *testing.T) {
 	errChan := make(chan error, 1)
 
-	handler := jstransport.NewSubscriber[emptyStruct, emptyStruct](
+	handler := jstransport.NewSubscriber(
 		func(context.Context, emptyStruct) (emptyStruct, error) {
 			return emptyStruct{}, errors.New("dang")
 		},

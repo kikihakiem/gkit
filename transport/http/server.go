@@ -20,7 +20,7 @@ type Server[Req, Res any] struct {
 	errorHandler gkit.ErrorHandler
 }
 
-// NewServer constructs a new server, which implements http.Handler and wraps
+// NewServer constructs a new HTTP server, which implements http.Handler and wraps
 // the provided endpoint.
 func NewServer[Req, Res any](
 	e gkit.Endpoint[Req, Res],
@@ -39,6 +39,16 @@ func NewServer[Req, Res any](
 		option(s)
 	}
 	return s
+}
+
+// NewHandlerFunc constructs a new http.HandlerFunc and wraps the provided endpoint.
+func NewHandlerFunc[Req, Res any](
+	e gkit.Endpoint[Req, Res],
+	dec gkit.EncodeDecodeFunc[*http.Request, Req],
+	enc EncodeResponseFunc[Res],
+	options ...ServerOption[Req, Res],
+) func(http.ResponseWriter, *http.Request) {
+	return NewServer(e, dec, enc, options...).ServeHTTP
 }
 
 // ServerOption sets an optional parameter for servers.

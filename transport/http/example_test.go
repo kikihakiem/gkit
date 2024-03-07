@@ -12,7 +12,7 @@ import (
 )
 
 func ExamplePopulateRequestContext() {
-	handler := httptransport.NewServer[struct{}, struct{}](
+	handler := httptransport.NewServer(
 		func(ctx context.Context, request struct{}) (response struct{}, err error) {
 			fmt.Println("Method", ctx.Value(httptransport.ContextKeyRequestMethod).(string))
 			fmt.Println("RequestPath", ctx.Value(httptransport.ContextKeyRequestPath).(string))

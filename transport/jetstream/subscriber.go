@@ -45,6 +45,17 @@ func NewSubscriber[Req, Res any](
 	return s
 }
 
+// NewMessageHandler constructs a new jetstream.MessageHandler and wraps the provided endpoint.
+func NewMessageHandler[Req, Res any](
+	js jetstream.JetStream,
+	e gkit.Endpoint[Req, Res],
+	dec gkit.EncodeDecodeFunc[jetstream.Msg, Req],
+	enc gkit.ResponseEncoder[jetstream.JetStream, Res],
+	options ...gkit.Option[*Subscriber[Req, Res]],
+) jetstream.MessageHandler {
+	return NewSubscriber(e, dec, enc, options...).HandleMessage(js)
+}
+
 // SubscriberBefore functions are executed on the publisher request object before the
 // request is decoded.
 func SubscriberBefore[Req, Res any](before ...gkit.BeforeRequestFunc[jetstream.Msg]) gkit.Option[*Subscriber[Req, Res]] {
