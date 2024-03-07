@@ -1,3 +1,5 @@
+github.com/kikihakiem/gkit/transport/http v0.4.0/go.mod h1:EYkrYOEhjhUybgnT8BfpophqnYpuro/wu/d/wXDRKO0=
+github.com/kikihakiem/gkit/transport/jetstream v0.3.0/go.mod h1:NIiGOWXz6C0SzZfWCG8c/QXg2NcZuVlZv/peLmNmt5A=
 go.etcd.io/gofail v0.1.0/go.mod h1:VZBCXYGZhHAinaBiiqYvuDynvahNsAyLFwB3kEHKz1M=
 go.uber.org/automaxprocs v1.5.3/go.mod h1:eRbA25aqJrxAbsLO0xy5jVwPt7FQnRgjW+efnwa1WM0=
 golang.org/x/mod v0.8.0/go.mod h1:iBbtSCu2XBx23ZKBPSOrRkjjQPZFPuis4dIYUhu/chs=
