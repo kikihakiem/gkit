@@ -1,6 +1,3 @@
-github.com/kikihakiem/gkit/core v0.4.0/go.mod h1:PjK77BVx0+eVzPqx4U9I0FT0ljRSenyKBDiM5KO4/oY=
-go.etcd.io/gofail v0.1.0/go.mod h1:VZBCXYGZhHAinaBiiqYvuDynvahNsAyLFwB3kEHKz1M=
-go.uber.org/automaxprocs v1.5.3/go.mod h1:eRbA25aqJrxAbsLO0xy5jVwPt7FQnRgjW+efnwa1WM0=
-golang.org/x/mod v0.8.0/go.mod h1:iBbtSCu2XBx23ZKBPSOrRkjjQPZFPuis4dIYUhu/chs=
-golang.org/x/term v0.16.0/go.mod h1:yn7UURbUtPyrVJPGPq404EukNFxcm/foM+bV/bfcDsY=
-golang.org/x/tools v0.6.0/go.mod h1:Xwgl3UAJ/d3gWutnCtw505GrjyAbvKui8lOU390QaIU=
+github.com/bobobox-id/gkit/core v0.1.0/go.mod h1:UEQ6v3Ri3SUCKe58NBAmre0ZpcJlWVM7yQDdn9RP1gs=
+github.com/bobobox-id/gkit/transport/http v0.1.0/go.mod h1:erw+de3UazT/RLdx2a0W2Rwm30RzO3JsJxnlG7Jktqw=
+github.com/bobobox-id/gkit/transport/jetstream v0.1.0/go.mod h1:SMbFFHx1y75enSmxwFIUBt/wOi8KCUVnGy+wMbbXJCI=

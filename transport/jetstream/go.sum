@@ -1,5 +1,5 @@
-github.com/bobobox-id/gkit/core v0.4.0 h1:NHiKDWJXkBGT2ZBd+n5vaK/iBa9aBCC1/cdZzeZYl3c=
-github.com/bobobox-id/gkit/core v0.4.0/go.mod h1:PjK77BVx0+eVzPqx4U9I0FT0ljRSenyKBDiM5KO4/oY=
+github.com/bobobox-id/gkit/core v0.1.0 h1:aobZPyrwr7V1G1sZAdn28Z7/1mxBtdKN+qtfhWDlsic=
+github.com/bobobox-id/gkit/core v0.1.0/go.mod h1:UEQ6v3Ri3SUCKe58NBAmre0ZpcJlWVM7yQDdn9RP1gs=
 github.com/klauspost/compress v1.17.5 h1:d4vBd+7CHydUqpFBgUEKkSdtSugf9YFmSkvUYPquI5E=
 github.com/klauspost/compress v1.17.5/go.mod h1:/dCuZOvVtNoHsyb+cuJD3itjs3NbnF6KH9zAO4BDxPM=
 github.com/minio/highwayhash v1.0.2 h1:Aak5U0nElisjDCfPSG79Tgzkn2gl66NxOMspRrKnA/g=
