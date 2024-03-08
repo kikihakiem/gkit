@@ -1,3 +1,9 @@
+github.com/bobobox-id/gkit/core v0.1.0 h1:aobZPyrwr7V1G1sZAdn28Z7/1mxBtdKN+qtfhWDlsic=
+github.com/bobobox-id/gkit/core v0.1.0/go.mod h1:UEQ6v3Ri3SUCKe58NBAmre0ZpcJlWVM7yQDdn9RP1gs=
+github.com/bobobox-id/gkit/transport/http v0.2.0 h1:Yt5hlT0wphXGzWhYou9wQEkMtuF8S0zWb4EVtK+k4O8=
+github.com/bobobox-id/gkit/transport/http v0.2.0/go.mod h1:nhguZzZUTfXE0YCU9YLmQLGR2j+mXFS775iR/y5U7j0=
+github.com/bobobox-id/gkit/transport/jetstream v0.2.0 h1:sVb3H1y7txPL2PnCHEikQDuIQOUNZudphmT8wUQKdh8=
+github.com/bobobox-id/gkit/transport/jetstream v0.2.0/go.mod h1:B9HQ7OP+8VejhjwtGApowEtun9H+A1vqv0D9CGBQaus=
 github.com/bwmarrin/snowflake v0.3.0 h1:xm67bEhkKh6ij1790JB83OujPR5CzNe8QuQqAgISZN0=
 github.com/bwmarrin/snowflake v0.3.0/go.mod h1:NdZxfVWX+oR6y2K0o6qAYv6gIOP9rjG0/E9WsDpxqwE=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -18,12 +24,6 @@ github.com/go-playground/validator/v10 v10.15.5/go.mod h1:9iXMNT7sEkjXb0I+enO7QX
 github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/M65Eg=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
-github.com/bobobox-id/gkit/core v0.4.0 h1:NHiKDWJXkBGT2ZBd+n5vaK/iBa9aBCC1/cdZzeZYl3c=
-github.com/bobobox-id/gkit/core v0.4.0/go.mod h1:PjK77BVx0+eVzPqx4U9I0FT0ljRSenyKBDiM5KO4/oY=
-github.com/bobobox-id/gkit/transport/http v0.4.0 h1:XcJ7v+CYr6y7PFq2ixixI4ZBv4+3aicagI+a0kqjEGI=
-github.com/bobobox-id/gkit/transport/http v0.4.0/go.mod h1:EYkrYOEhjhUybgnT8BfpophqnYpuro/wu/d/wXDRKO0=
-github.com/bobobox-id/gkit/transport/jetstream v0.3.0 h1:U6eTJJwgqHuCAS2AdUNAsFscLAG96iCoFpSTl/zE66Y=
-github.com/bobobox-id/gkit/transport/jetstream v0.3.0/go.mod h1:NIiGOWXz6C0SzZfWCG8c/QXg2NcZuVlZv/peLmNmt5A=
 github.com/klauspost/compress v1.17.5 h1:d4vBd+7CHydUqpFBgUEKkSdtSugf9YFmSkvUYPquI5E=
 github.com/klauspost/compress v1.17.5/go.mod h1:/dCuZOvVtNoHsyb+cuJD3itjs3NbnF6KH9zAO4BDxPM=
 github.com/leodido/go-urn v1.2.4 h1:XlAE/cm/ms7TE/VMVoduSpNBoyc2dOxHs5MZSwAN63Q=
