@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/kikihakiem/gkit/example/internal/audit"
-	"github.com/kikihakiem/gkit/example/internal/repository"
-	"github.com/kikihakiem/gkit/example/internal/transport"
+	"github.com/bobobox-id/gkit/example/internal/audit"
+	"github.com/bobobox-id/gkit/example/internal/repository"
+	"github.com/bobobox-id/gkit/example/internal/transport"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 

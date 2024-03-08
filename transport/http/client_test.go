@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	httptransport "github.com/kikihakiem/gkit/transport/http"
+	httptransport "github.com/bobobox-id/gkit/transport/http"
 )
 
 type TestResponse struct {

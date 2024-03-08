@@ -1,12 +1,12 @@
-module github.com/kikihakiem/gkit/example
+module github.com/bobobox-id/gkit/example
 
 go 1.21.6
 
 require (
 	github.com/go-chi/chi/v5 v5.0.12
-	github.com/kikihakiem/gkit/core v0.4.0
-	github.com/kikihakiem/gkit/transport/http v0.4.0
-	github.com/kikihakiem/gkit/transport/jetstream v0.3.0
+	github.com/bobobox-id/gkit/core v0.4.0
+	github.com/bobobox-id/gkit/transport/http v0.4.0
+	github.com/bobobox-id/gkit/transport/jetstream v0.3.0
 	github.com/nats-io/nats-server/v2 v2.10.10
 	github.com/nats-io/nats.go v1.32.0
 	github.com/nokusukun/bingo v0.3.1

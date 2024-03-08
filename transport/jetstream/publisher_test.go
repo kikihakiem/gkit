@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	gkit "github.com/kikihakiem/gkit/core"
-	jstransport "github.com/kikihakiem/gkit/transport/jetstream"
+	gkit "github.com/bobobox-id/gkit/core"
+	jstransport "github.com/bobobox-id/gkit/transport/jetstream"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )

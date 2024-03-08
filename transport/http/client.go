@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	gkit "github.com/kikihakiem/gkit/core"
+	gkit "github.com/bobobox-id/gkit/core"
 )
 
 // HTTPClient is an interface that models *http.Client.

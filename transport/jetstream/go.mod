@@ -1,9 +1,9 @@
-module github.com/kikihakiem/gkit/transport/jetstream
+module github.com/bobobox-id/gkit/transport/jetstream
 
 go 1.21.6
 
 require (
-	github.com/kikihakiem/gkit/core v0.4.0
+	github.com/bobobox-id/gkit/core v0.4.0
 	github.com/nats-io/nats-server/v2 v2.10.10
 	github.com/nats-io/nats.go v1.32.0
 )

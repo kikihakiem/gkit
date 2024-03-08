@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	httptransport "github.com/kikihakiem/gkit/transport/http"
+	httptransport "github.com/bobobox-id/gkit/transport/http"
 )
 
 func ExamplePopulateRequestContext() {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	gkit "github.com/kikihakiem/gkit/core"
+	gkit "github.com/bobobox-id/gkit/core"
 )
 
 // Server wraps an endpoint and implements http.Handler.

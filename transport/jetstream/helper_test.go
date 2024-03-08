@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	jstransport "github.com/kikihakiem/gkit/transport/jetstream"
+	jstransport "github.com/bobobox-id/gkit/transport/jetstream"
 	"github.com/nats-io/nats-server/v2/server"
 	natsserver "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"

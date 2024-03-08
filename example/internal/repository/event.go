@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/kikihakiem/gkit/example/internal/audit"
+	"github.com/bobobox-id/gkit/example/internal/audit"
 	"github.com/nokusukun/bingo"
 )
 

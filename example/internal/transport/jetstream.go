@@ -1,9 +1,9 @@
 package transport
 
 import (
-	gkit "github.com/kikihakiem/gkit/core"
-	"github.com/kikihakiem/gkit/example/internal/audit"
-	jstransport "github.com/kikihakiem/gkit/transport/jetstream"
+	gkit "github.com/bobobox-id/gkit/core"
+	"github.com/bobobox-id/gkit/example/internal/audit"
+	jstransport "github.com/bobobox-id/gkit/transport/jetstream"
 	"github.com/nats-io/nats.go/jetstream"
 )
 

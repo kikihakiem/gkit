@@ -3,10 +3,10 @@ package transport
 import (
 	"net/http"
 
+	gkit "github.com/bobobox-id/gkit/core"
+	"github.com/bobobox-id/gkit/example/internal/audit"
+	httptransport "github.com/bobobox-id/gkit/transport/http"
 	"github.com/go-chi/chi/v5"
-	gkit "github.com/kikihakiem/gkit/core"
-	"github.com/kikihakiem/gkit/example/internal/audit"
-	httptransport "github.com/kikihakiem/gkit/transport/http"
 )
 
 func createEventHTTPHandler(eventSvc *audit.EventService) http.Handler {

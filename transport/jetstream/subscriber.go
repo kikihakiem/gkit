@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 
-	gkit "github.com/kikihakiem/gkit/core"
+	gkit "github.com/bobobox-id/gkit/core"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )

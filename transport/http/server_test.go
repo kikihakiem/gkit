@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	gkit "github.com/kikihakiem/gkit/core"
-	httptransport "github.com/kikihakiem/gkit/transport/http"
+	gkit "github.com/bobobox-id/gkit/core"
+	httptransport "github.com/bobobox-id/gkit/transport/http"
 )
 
 type emptyStruct struct{}

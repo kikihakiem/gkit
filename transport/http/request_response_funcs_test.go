@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	httptransport "github.com/kikihakiem/gkit/transport/http"
+	httptransport "github.com/bobobox-id/gkit/transport/http"
 )
 
 func TestSetHeader(t *testing.T) {

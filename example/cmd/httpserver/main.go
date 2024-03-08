@@ -4,10 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/bobobox-id/gkit/example/internal/audit"
+	"github.com/bobobox-id/gkit/example/internal/repository"
+	"github.com/bobobox-id/gkit/example/internal/transport"
 	"github.com/go-chi/chi/v5"
-	"github.com/kikihakiem/gkit/example/internal/audit"
-	"github.com/kikihakiem/gkit/example/internal/repository"
-	"github.com/kikihakiem/gkit/example/internal/transport"
 )
 
 func main() {
