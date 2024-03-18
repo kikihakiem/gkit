@@ -167,7 +167,25 @@ func DecodeJSONRequest[Req any](_ context.Context, r *http.Request) (Req, error)
 // provided StatusCode will be used instead of 200.
 func EncodeJSONResponse[Res any](_ context.Context, w http.ResponseWriter, response Res) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+
+	if headerer, ok := any(response).(Headerer); ok {
+		for k, values := range headerer.Headers() {
+			for _, v := range values {
+				w.Header().Add(k, v)
+			}
+		}
+	}
+
+	code := http.StatusOK
+	if sc, ok := any(response).(StatusCoder); ok {
+		code = sc.StatusCode()
+	}
+
+	w.WriteHeader(code)
+
+	if code == http.StatusNoContent {
+		return nil
+	}
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -181,12 +199,15 @@ func EncodeJSONResponse[Res any](_ context.Context, w http.ResponseWriter, respo
 // the provided StatusCode will be used instead of 500.
 func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
 	contentType, body := "text/plain; charset=utf-8", []byte(err.Error())
+
 	if marshaler, ok := err.(json.Marshaler); ok {
 		if jsonBody, marshalErr := marshaler.MarshalJSON(); marshalErr == nil {
 			contentType, body = "application/json; charset=utf-8", jsonBody
 		}
 	}
+
 	w.Header().Set("Content-Type", contentType)
+
 	if headerer, ok := err.(Headerer); ok {
 		for k, values := range headerer.Headers() {
 			for _, v := range values {
@@ -194,10 +215,12 @@ func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
 			}
 		}
 	}
+
 	code := http.StatusInternalServerError
 	if sc, ok := err.(StatusCoder); ok {
 		code = sc.StatusCode()
 	}
+
 	w.WriteHeader(code)
 	w.Write(body) //nolint:errcheck
 }

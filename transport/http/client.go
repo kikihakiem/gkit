@@ -174,8 +174,15 @@ type ClientFinalizerFunc func(ctx context.Context, err error)
 func EncodeJSONRequest[Req any](c context.Context, r *http.Request, request Req) error {
 	r.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+	if headerer, ok := any(request).(Headerer); ok {
+		for k := range headerer.Headers() {
+			r.Header.Set(k, headerer.Headers().Get(k))
+		}
+	}
+
 	var b bytes.Buffer
 	r.Body = io.NopCloser(&b)
+
 	return json.NewEncoder(&b).Encode(request)
 }
 

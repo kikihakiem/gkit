@@ -192,13 +192,17 @@ func TestClientFinalizer(t *testing.T) {
 }
 
 func TestEncodeJSONRequest(t *testing.T) {
-	var body string
+	var (
+		header http.Header
+		body   string
+	)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(r.Body)
 		if err != nil && err != io.EOF {
 			t.Fatal(err)
 		}
+		header = r.Header
 
 		body = string(b)
 	}))
@@ -235,6 +239,18 @@ func TestEncodeJSONRequest(t *testing.T) {
 
 		if body != test.body {
 			t.Errorf("%v: actual %#v, expected %#v", test.value, body, test.body)
+		}
+
+		if _, err := client(context.Background(), enhancedRequest{Foo: "foo"}); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, ok := header["X-Edward"]; !ok {
+			t.Fatalf("X-Edward value: actual %v, expected %v", nil, []string{"Snowden"})
+		}
+
+		if v := header.Get("X-Edward"); v != "Snowden" {
+			t.Errorf("X-Edward string: actual %v, expected %v", v, "Snowden")
 		}
 	}
 }
