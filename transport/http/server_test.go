@@ -270,7 +270,7 @@ func TestEncodeJSONResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want, have := http.StatusOK, resp.StatusCode; want != have {
+	if want, have := http.StatusPaymentRequired, resp.StatusCode; want != have {
 		t.Errorf("StatusCode: want %d, have %d", want, have)
 	}
 	buf, _ := io.ReadAll(resp.Body)
@@ -347,6 +347,33 @@ func TestAddMultipleHeadersErrorEncoder(t *testing.T) {
 	}
 	if b, _ := io.ReadAll(resp.Body); errStr != string(b) {
 		t.Errorf("ErrorEncoder: got: %q, expected: %q", b, errStr)
+	}
+}
+
+type noContentResponse emptyStruct
+
+func (e noContentResponse) StatusCode() int { return http.StatusNoContent }
+
+func TestEncodeNoContent(t *testing.T) {
+	handler := httptransport.NewServer(
+		func(context.Context, interface{}) (interface{}, error) { return noContentResponse{}, nil },
+		func(context.Context, *http.Request) (interface{}, error) { return emptyStruct{}, nil },
+		httptransport.EncodeJSONResponse,
+	)
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want, have := http.StatusNoContent, resp.StatusCode; want != have {
+		t.Errorf("StatusCode: want %d, have %d", want, have)
+	}
+	buf, _ := io.ReadAll(resp.Body)
+	if want, have := 0, len(buf); want != have {
+		t.Errorf("Body: want no content, have %d bytes", have)
 	}
 }
 
