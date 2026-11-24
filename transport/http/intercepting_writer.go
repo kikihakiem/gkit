@@ -24,6 +24,19 @@ func (w *interceptingWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// Unwrap returns the wrapped ResponseWriter, so http.ResponseController can
+// reach the original writer.
+func (w *interceptingWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+// unwrapper is embedded by the writers that reimplementInterfaces returns, so
+// that Unwrap stays visible on them.
+type unwrapper interface {
+	http.ResponseWriter
+	Unwrap() http.ResponseWriter
+}
+
 // reimplementInterfaces returns a wrapped version of the embedded ResponseWriter
 // and selectively implements the same combination of additional interfaces as
 // the wrapped one. The interfaces it may implement are: http.Hijacker,
@@ -42,95 +55,95 @@ func (w *interceptingWriter) reimplementInterfaces() http.ResponseWriter {
 	switch {
 	case !i1 && !i2 && !i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 		}{w}
 	case !i1 && !i2 && !i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			io.ReaderFrom
 		}{w, rf}
 	case !i1 && !i2 && i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Flusher
 		}{w, fl}
 	case !i1 && !i2 && i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Flusher
 			io.ReaderFrom
 		}{w, fl, rf}
 	case !i1 && i2 && !i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Pusher
 		}{w, pu}
 	case !i1 && i2 && !i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Pusher
 			io.ReaderFrom
 		}{w, pu, rf}
 	case !i1 && i2 && i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Pusher
 			http.Flusher
 		}{w, pu, fl}
 	case !i1 && i2 && i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Pusher
 			http.Flusher
 			io.ReaderFrom
 		}{w, pu, fl, rf}
 	case i1 && !i2 && !i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 		}{w, hj}
 	case i1 && !i2 && !i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			io.ReaderFrom
 		}{w, hj, rf}
 	case i1 && !i2 && i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			http.Flusher
 		}{w, hj, fl}
 	case i1 && !i2 && i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			http.Flusher
 			io.ReaderFrom
 		}{w, hj, fl, rf}
 	case i1 && i2 && !i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			http.Pusher
 		}{w, hj, pu}
 	case i1 && i2 && !i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			http.Pusher
 			io.ReaderFrom
 		}{w, hj, pu, rf}
 	case i1 && i2 && i3 && !i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			http.Pusher
 			http.Flusher
 		}{w, hj, pu, fl}
 	case i1 && i2 && i3 && i4:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 			http.Hijacker
 			http.Pusher
 			http.Flusher
@@ -138,7 +151,7 @@ func (w *interceptingWriter) reimplementInterfaces() http.ResponseWriter {
 		}{w, hj, pu, fl, rf}
 	default:
 		return struct {
-			http.ResponseWriter
+			unwrapper
 		}{w}
 	}
 }

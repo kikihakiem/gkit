@@ -56,6 +56,20 @@ func TestInterceptingWriter_passthroughs(t *testing.T) {
 	}
 }
 
+func TestInterceptingWriter_unwrap(t *testing.T) {
+	inner := &versatileWriter{}
+	iw := &interceptingWriter{ResponseWriter: inner}
+
+	wrapped := iw.reimplementInterfaces()
+	unwrapper, ok := wrapped.(interface{ Unwrap() http.ResponseWriter })
+	if !ok {
+		t.Fatal("wrapped writer does not implement Unwrap")
+	}
+	if got := unwrapper.Unwrap(); got != inner {
+		t.Errorf("want %p, have %p", inner, got)
+	}
+}
+
 // TestInterceptingWriter_reimplementInterfaces is also derived from
 // https://github.com/felixge/httpsnoop, like interceptingWriter.
 func TestInterceptingWriter_reimplementInterfaces(t *testing.T) {
