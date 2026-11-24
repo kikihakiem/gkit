@@ -3,7 +3,6 @@ module github.com/kikihakiem/gkit/example
 go 1.22
 
 require (
-	github.com/go-chi/chi/v5 v5.0.12
 	github.com/kikihakiem/gkit/core v0.4.0
 	github.com/kikihakiem/gkit/transport/http v0.4.0
 	github.com/kikihakiem/gkit/transport/jetstream v0.3.0
