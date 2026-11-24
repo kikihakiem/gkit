@@ -1,0 +1,27 @@
+name: Echo
+on:
+  pull_request:
+    paths:
+      - 'transport/echo/**'
+      - 'core/**'
+
+jobs:
+  quality-check:
+    name: Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.4'
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          args: --timeout 2m --tests=false
+          working-directory: './transport/echo'
+      - name: Test
+        run: go test --tags=unit -v -timeout 30s -count=1 ./... -coverprofile=test-report.out
+        working-directory: './transport/echo'
