@@ -265,26 +265,82 @@ func TestSubscriberFinalizerFunc(t *testing.T) {
 }
 
 func TestEncodeJSONResponse(t *testing.T) {
-	dataChan := make(chan string, 1)
+	var (
+		dataChan    = make(chan string, 1)
+		subjectChan = make(chan string, 1)
+		subject     = "jstransport.test"
+	)
 
 	type foo struct {
 		Foo string `json:"foo"`
 	}
 
-	jstransport.EncodeJSONResponse(context.Background(), &jetstreamMock{dataChan: dataChan}, foo{Foo: "bar"})
+	ctx := context.WithValue(context.Background(), jstransport.ContextKeyResponseSubject, subject)
+
+	err := jstransport.EncodeJSONResponse(ctx, &jetstreamMock{dataChan: dataChan, subjectChan: subjectChan}, foo{Foo: "bar"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want, have := subject, <-subjectChan; want != have {
+		t.Errorf("Subject: want %s, have %s", want, have)
+	}
 
 	if want, have := `{"foo":"bar"}`, strings.TrimSpace(<-dataChan); want != have {
 		t.Errorf("Body: want %s, have %s", want, have)
 	}
 }
 
-func TestEncodeJSONError(t *testing.T) {
-	dataChan := make(chan string, 1)
+func TestEncodeJSONResponseNoSubject(t *testing.T) {
+	err := jstransport.EncodeJSONResponse(context.Background(), &jetstreamMock{dataChan: make(chan string, 1)}, struct{}{})
+	if !errors.Is(err, jstransport.ErrNoResponseSubject) {
+		t.Errorf("want %v, have %v", jstransport.ErrNoResponseSubject, err)
+	}
+}
 
-	jstransport.EncodeJSONError(context.Background(), &jetstreamMock{dataChan: dataChan}, errors.New("dang"))
+func TestEncodeJSONError(t *testing.T) {
+	var (
+		dataChan    = make(chan string, 1)
+		subjectChan = make(chan string, 1)
+		subject     = "jstransport.test"
+	)
+
+	ctx := context.WithValue(context.Background(), jstransport.ContextKeyResponseSubject, subject)
+
+	jstransport.EncodeJSONError(ctx, &jetstreamMock{dataChan: dataChan, subjectChan: subjectChan}, errors.New("dang"))
+
+	if want, have := subject, <-subjectChan; want != have {
+		t.Errorf("Subject: want %s, have %s", want, have)
+	}
 
 	if want, have := `{"err":"dang"}`, strings.TrimSpace(<-dataChan); want != have {
 		t.Errorf("Body: want %s, have %s", want, have)
+	}
+}
+
+func TestSubscriberResponseSubject(t *testing.T) {
+	const subject = "jstransport.test"
+
+	subjectChan := make(chan string, 1)
+
+	handler := jstransport.NewSubscriber(
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopEncoderDecoder,
+		gkit.NopResponseEncoder,
+		jstransport.SubscriberResponseSubject[emptyStruct, emptyStruct](subject),
+		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, _ jetstream.Msg, _ error) {
+			got, _ := ctx.Value(jstransport.ContextKeyResponseSubject).(string)
+			subjectChan <- got
+		}),
+	)
+
+	js, stop := newConsumer(t, handler)
+	defer stop()
+
+	publish(t, js, "test data")
+
+	if want, have := subject, <-subjectChan; want != have {
+		t.Errorf("want %s, have %s", want, have)
 	}
 }
 
@@ -312,6 +368,35 @@ func TestErrorLogger(t *testing.T) {
 	}
 }
 
+func TestMultipleSubscriberFinalizers(t *testing.T) {
+	finChan := make(chan struct{}, 2)
+
+	finalizer := jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(context.Context, jetstream.Msg, error) {
+		finChan <- struct{}{}
+	})
+
+	handler := jstransport.NewSubscriber(
+		gkit.NopEndpoint[emptyStruct, emptyStruct],
+		gkit.NopEncoderDecoder,
+		gkit.NopResponseEncoder,
+		finalizer,
+		finalizer,
+	)
+
+	js, stop := newConsumer(t, handler)
+	defer stop()
+
+	publish(t, js, "test data")
+
+	for i := 1; i <= 2; i++ {
+		select {
+		case <-finChan:
+		case <-time.After(time.Second):
+			t.Fatalf("finalizer %d did not run", i)
+		}
+	}
+}
+
 func TestNoOpRequestDecoder(t *testing.T) {
 	errChan := make(chan error, 1)
 
@@ -327,6 +412,7 @@ func TestNoOpRequestDecoder(t *testing.T) {
 		},
 		gkit.NopEncoderDecoder,
 		jstransport.EncodeJSONResponse,
+		jstransport.SubscriberResponseSubject[any, any]("jstransport.test"),
 	)
 
 	js, stop := newConsumer(t, handler)

@@ -18,6 +18,7 @@ type Publisher[Req, Res any] struct {
 	before    []gkit.BeforeRequestFunc[*nats.Msg]
 	after     []gkit.AfterResponseFunc[*jetstream.PubAck]
 	timeout   time.Duration
+	subject   string
 }
 
 // NewPublisher constructs a usable Publisher for a single remote method.
@@ -59,6 +60,12 @@ func PublisherTimeout[Req, Res any](timeout time.Duration) gkit.Option[*Publishe
 	return func(p *Publisher[Req, Res]) { p.timeout = timeout }
 }
 
+// PublisherSubject sets the subject of the published message. PublisherBefore
+// functions run after this value is applied, so they can replace it.
+func PublisherSubject[Req, Res any](subject string) gkit.Option[*Publisher[Req, Res]] {
+	return func(p *Publisher[Req, Res]) { p.subject = subject }
+}
+
 // Endpoint returns a usable endpoint that invokes the remote endpoint.
 func (p Publisher[Req, Res]) Endpoint() gkit.Endpoint[Req, Res] {
 	return func(ctx context.Context, request Req) (Res, error) {
@@ -70,6 +77,10 @@ func (p Publisher[Req, Res]) Endpoint() gkit.Endpoint[Req, Res] {
 		msg, err := p.enc(ctx, request)
 		if err != nil {
 			return response, err
+		}
+
+		if p.subject != "" {
+			msg.Subject = p.subject
 		}
 
 		for _, f := range p.before {
@@ -95,15 +106,15 @@ func (p Publisher[Req, Res]) Endpoint() gkit.Endpoint[Req, Res] {
 }
 
 // EncodeJSONRequest is an EncodeRequestFunc that serializes the request as a
-// JSON object to the Data of the Msg. Many JSON-over-NATS services can use it as
-// a sensible default.
+// JSON object to the Data of the Msg. The message has no subject; set one with
+// PublisherSubject or in a PublisherBefore function.
 func EncodeJSONRequest[In any](_ context.Context, request In) (*nats.Msg, error) {
 	b, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
 	}
 
-	msg := nats.NewMsg("jstransport.response")
+	msg := nats.NewMsg("")
 	msg.Data = b
 
 	return msg, nil

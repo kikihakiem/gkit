@@ -98,10 +98,14 @@ func publish(t *testing.T, js jetstream.JetStream, message string) {
 
 type jetstreamMock struct {
 	jetstream.JetStream
-	dataChan chan string
+	dataChan    chan string
+	subjectChan chan string
 }
 
 func (jm *jetstreamMock) PublishMsg(_ context.Context, msg *nats.Msg, _ ...jetstream.PublishOpt) (*jetstream.PubAck, error) {
+	if jm.subjectChan != nil {
+		jm.subjectChan <- msg.Subject
+	}
 	jm.dataChan <- string(msg.Data)
 	return nil, nil
 }

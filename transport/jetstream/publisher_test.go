@@ -17,10 +17,11 @@ func TestPublisher(t *testing.T) {
 	js, _, stop := newJetstream(context.Background(), t)
 	defer stop()
 
-	publisher := jstransport.NewPublisher[struct{}](
+	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.PassThroughEncoderDecoder,
+		jstransport.PublisherSubject[struct{}, *jetstream.PubAck]("jstransport.test"),
 	)
 
 	res, err := publisher.Endpoint()(context.Background(), struct{}{})
@@ -75,6 +76,7 @@ func TestPublisherAfter(t *testing.T) {
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.PassThroughEncoderDecoder,
+		jstransport.PublisherSubject[struct{}, *jetstream.PubAck]("jstransport.test"),
 		jstransport.PublisherAfter[struct{}, *jetstream.PubAck](func(ctx context.Context, pa *jetstream.PubAck, err error) context.Context {
 			pa.Stream = alteredStreamName // alter the stream name just to check if this function is called
 			return ctx
@@ -99,6 +101,7 @@ func TestPublisherTimeout(t *testing.T) {
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.NopEncoderDecoder,
+		jstransport.PublisherSubject[struct{}, *jetstream.PubAck]("jstransport.test"),
 		jstransport.PublisherTimeout[struct{}, *jetstream.PubAck](time.Nanosecond), // set a very low timeout
 	)
 
@@ -116,6 +119,7 @@ func TestPublisherCancellation(t *testing.T) {
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.NopEncoderDecoder,
+		jstransport.PublisherSubject[struct{}, *jetstream.PubAck]("jstransport.test"),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -124,6 +128,49 @@ func TestPublisherCancellation(t *testing.T) {
 	_, err := publisher.Endpoint()(ctx, struct{}{})
 	if err != context.Canceled {
 		t.Errorf("want %s, have %s", context.Canceled, err)
+	}
+}
+
+func TestPublisherRequiresSubject(t *testing.T) {
+	js, _, stop := newJetstream(context.Background(), t)
+	defer stop()
+
+	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
+		js,
+		jstransport.EncodeJSONRequest,
+		gkit.NopEncoderDecoder,
+	)
+
+	if _, err := publisher.Endpoint()(context.Background(), struct{}{}); err == nil {
+		t.Fatal("expected an error when the message has no subject")
+	}
+}
+
+func TestPublisherSubject(t *testing.T) {
+	const subject = "jstransport.test.subject"
+
+	subjectChan := make(chan string, 1)
+
+	js, _, stop := newJetstream(context.Background(), t)
+	defer stop()
+
+	publisher := jstransport.NewPublisher[struct{}, *jetstream.PubAck](
+		js,
+		jstransport.EncodeJSONRequest,
+		gkit.NopEncoderDecoder,
+		jstransport.PublisherSubject[struct{}, *jetstream.PubAck](subject),
+		jstransport.PublisherBefore[struct{}, *jetstream.PubAck](func(ctx context.Context, msg *nats.Msg) context.Context {
+			subjectChan <- msg.Subject
+			return ctx
+		}),
+	)
+
+	if _, err := publisher.Endpoint()(context.Background(), struct{}{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := <-subjectChan; got != subject {
+		t.Errorf("want %q, have %q", subject, got)
 	}
 }
 
@@ -137,6 +184,7 @@ func TestEncodeJSONRequest(t *testing.T) {
 		js,
 		jstransport.EncodeJSONRequest,
 		gkit.NopEncoderDecoder,
+		jstransport.PublisherSubject[any, *jetstream.PubAck]("jstransport.test"),
 		jstransport.PublisherBefore[any, *jetstream.PubAck](func(ctx context.Context, msg *nats.Msg) context.Context {
 			encoded <- string(msg.Data)
 			return ctx
