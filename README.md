@@ -2,6 +2,8 @@
 
 Stands for Generic Kit. Heavily inspired by [Go kit](https://github.com/go-kit/kit).
 
+Requires Go 1.22 or later.
+
 ## Why?
 
 Because this is better:
