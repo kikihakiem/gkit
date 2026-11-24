@@ -28,12 +28,11 @@ func (f ErrorHandlerFunc) Handle(ctx context.Context, err error) {
 // LogFunc may use a different module to do logging.
 type LogFunc func(context.Context, error)
 
-// LogErrorHandler logs error if any using LogFunc. If LogFunc
-// is not present, it logs using slog.
-var LogErrorHandler = func(logFunc LogFunc) ErrorHandlerFunc {
+// LogErrorHandler logs errors with LogFunc. When logFunc is nil, it logs with slog.
+func LogErrorHandler(logFunc LogFunc) ErrorHandlerFunc {
 	return func(ctx context.Context, err error) {
 		if logFunc == nil {
-			slog.ErrorContext(ctx, err.Error())
+			slog.ErrorContext(ctx, "request failed", slog.Any("error", err))
 		} else {
 			logFunc(ctx, err)
 		}
