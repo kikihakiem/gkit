@@ -1,0 +1,8 @@
+version: "2"
+
+linters:
+  exclusions:
+    presets:
+      # Do not report unchecked errors from Close, Flush and print calls,
+      # because deferred body closes in the transports ignore them on purpose.
+      - std-error-handling
