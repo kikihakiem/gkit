@@ -8,6 +8,6 @@ import (
 // request context.
 type BeforeRequestFunc[Req any] func(ctx context.Context, req Req) context.Context
 
-// AfterResponseFunc may take information from response and error and put it into a
-// response context.
-type AfterResponseFunc[Res any] func(ctx context.Context, resp Res, err error) context.Context
+// AfterResponseFunc may take information from a response and put it into the
+// context. It runs only after the endpoint succeeds, so it receives no error.
+type AfterResponseFunc[Res any] func(ctx context.Context, resp Res) context.Context

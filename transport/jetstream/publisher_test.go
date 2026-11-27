@@ -77,7 +77,7 @@ func TestPublisherAfter(t *testing.T) {
 		jstransport.EncodeJSONRequest,
 		gkit.PassThroughEncoderDecoder,
 		jstransport.PublisherSubject("jstransport.test"),
-		jstransport.PublisherAfter(func(ctx context.Context, pa *jetstream.PubAck, err error) context.Context {
+		jstransport.PublisherAfter(func(ctx context.Context, pa *jetstream.PubAck) context.Context {
 			pa.Stream = alteredStreamName // alter the stream name just to check if this function is called
 			return ctx
 		}),

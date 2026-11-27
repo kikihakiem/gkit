@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	gkit "github.com/kikihakiem/gkit/core"
@@ -99,7 +100,7 @@ func ServerFinalizer(f ...ServerFinalizerFunc) ServerOption {
 }
 
 // ServeHTTP implements http.Handler.
-func (s Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if len(s.finalizer) > 0 {
@@ -121,24 +122,24 @@ func (s Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	request, err := s.dec(ctx, r)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, w, err)
+		s.errorEncoder(ctx, err, w)
 		return
 	}
 
 	response, err := s.e(ctx, request)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, w, err)
+		s.errorEncoder(ctx, err, w)
 		return
 	}
 
 	for _, f := range s.after {
-		ctx = f(ctx, w, err)
+		ctx = f(ctx, w)
 	}
 
 	if err := s.enc(ctx, w, response); err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, w, err)
+		s.errorEncoder(ctx, err, w)
 		return
 	}
 }
@@ -199,11 +200,13 @@ func EncodeJSONResponse[Res any](_ context.Context, w http.ResponseWriter, respo
 // will be applied to the response. If the error implements json.Marshaler, and
 // the marshaling succeeds, a content type of application/json and the JSON
 // encoded form of the error will be used. If the error implements StatusCoder,
-// the provided StatusCode will be used instead of 500.
-func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
+// the provided StatusCode will be used instead of 500. These checks also find
+// an implementation inside a wrapped error, using errors.As.
+func DefaultErrorEncoder(_ context.Context, err error, w http.ResponseWriter) {
 	contentType, body := "text/plain; charset=utf-8", []byte(err.Error())
 
-	if marshaler, ok := err.(json.Marshaler); ok {
+	var marshaler json.Marshaler
+	if errors.As(err, &marshaler) {
 		if jsonBody, marshalErr := marshaler.MarshalJSON(); marshalErr == nil {
 			contentType, body = "application/json; charset=utf-8", jsonBody
 		}
@@ -211,7 +214,8 @@ func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
 
 	w.Header().Set("Content-Type", contentType)
 
-	if headerer, ok := err.(Headerer); ok {
+	var headerer Headerer
+	if errors.As(err, &headerer) {
 		for k, values := range headerer.Headers() {
 			for _, v := range values {
 				w.Header().Add(k, v)
@@ -220,7 +224,8 @@ func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
 	}
 
 	code := http.StatusInternalServerError
-	if sc, ok := err.(StatusCoder); ok {
+	var sc StatusCoder
+	if errors.As(err, &sc) {
 		code = sc.StatusCode()
 	}
 

@@ -10,8 +10,9 @@ type EncodeDecodeFunc[In, Out any] func(ctx context.Context, request In) (Out, e
 // ResponseEncoder encodes a user-domain object as a response to a request.
 type ResponseEncoder[RespWriter, Res any] func(ctx context.Context, respWriter RespWriter, response Res) error
 
-// ErrorEncoder is responsible for encoding an error.
-type ErrorEncoder[RespWriter any] func(ctx context.Context, respWriter RespWriter, err error)
+// ErrorEncoder is responsible for encoding an error. Its argument order matches
+// go-kit's ErrorEncoder, so a go-kit error encoder can be used as is.
+type ErrorEncoder[RespWriter any] func(ctx context.Context, err error, respWriter RespWriter)
 
 // NopEncoderDecoder is a EncodeDecodeFunc that returns zero value of the output and nil error.
 func NopEncoderDecoder[In, Out any](context.Context, In) (Out, error) {
@@ -30,5 +31,5 @@ func NopResponseEncoder[Res, RespWriter any](context.Context, RespWriter, Res) e
 }
 
 // NopErrorEncoder does nothing.
-func NopErrorEncoder[RespWriter any](context.Context, RespWriter, error) {
+func NopErrorEncoder[RespWriter any](context.Context, error, RespWriter) {
 }

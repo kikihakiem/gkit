@@ -5,6 +5,7 @@ package echo_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -66,7 +67,7 @@ func TestServerErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, echo.Context, emptyStruct) error { return nil },
-		echotransport.ServerErrorEncoder(func(_ context.Context, c echo.Context, err error) { c.Response().WriteHeader(code(err)) }),
+		echotransport.ServerErrorEncoder(func(_ context.Context, err error, c echo.Context) { c.Response().WriteHeader(code(err)) }),
 	)
 	rec, _ := handleWith[emptyStruct, emptyStruct](handlerFunc)
 	if want, have := http.StatusTeapot, rec.Result().StatusCode; want != have {
@@ -163,12 +164,12 @@ func TestMultipleServerAfter(t *testing.T) {
 			c.Response().Write([]byte(responseBody))
 			return nil
 		},
-		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context {
+		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context {
+		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerAfters are used")
 			}
@@ -438,7 +439,7 @@ func testServer(t *testing.T) (step func(), resp <-chan *httptest.ResponseRecord
 			func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, echo.Context, emptyStruct) error { return nil },
 			echotransport.ServerBefore(func(ctx context.Context, _ echo.Context) context.Context { return ctx }),
-			echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context { return ctx }),
+			echotransport.ServerAfter(func(ctx context.Context, _ echo.Context) context.Context { return ctx }),
 		)
 	)
 	go func() {
@@ -458,4 +459,20 @@ func handleWith[Req, Res any](handlerFunc echo.HandlerFunc) (*httptest.ResponseR
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	return rec, handlerFunc(c)
+}
+
+func TestDefaultErrorEncoderUnwrapsErrors(t *testing.T) {
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+	echotransport.DefaultErrorEncoder(context.Background(), fmt.Errorf("get order: %w", enhancedError{}), c)
+
+	if want, have := http.StatusTeapot, rec.Code; want != have {
+		t.Errorf("StatusCode: want %d, have %d", want, have)
+	}
+	if want, have := "1", rec.Header().Get("X-Enhanced"); want != have {
+		t.Errorf("X-Enhanced: want %q, have %q", want, have)
+	}
+	if want, have := `{"err":"enhanced"}`, rec.Body.String(); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
+	}
 }

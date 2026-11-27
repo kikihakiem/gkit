@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -70,7 +71,7 @@ func TestServerErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
-		httptransport.ServerErrorEncoder(func(_ context.Context, w http.ResponseWriter, err error) { w.WriteHeader(code(err)) }),
+		httptransport.ServerErrorEncoder(func(_ context.Context, err error, w http.ResponseWriter) { w.WriteHeader(code(err)) }),
 	)
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -174,12 +175,12 @@ func TestMultipleServerAfter(t *testing.T) {
 			w.Write([]byte(responseBody))
 			return nil
 		},
-		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
+		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
+		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerAfters are used")
 			}
@@ -444,7 +445,7 @@ func testServer(t *testing.T) (step func(), resp <-chan *http.Response) {
 			func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
 			httptransport.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context { return ctx }),
-			httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context { return ctx }),
+			httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter) context.Context { return ctx }),
 		)
 	)
 	go func() {
@@ -464,7 +465,7 @@ func TestServerOptionWorksForAnyServerType(t *testing.T) {
 	var calls int
 
 	// One option value, used by two servers with different request and response types.
-	errorEncoder := httptransport.ServerErrorEncoder(func(_ context.Context, w http.ResponseWriter, _ error) {
+	errorEncoder := httptransport.ServerErrorEncoder(func(_ context.Context, _ error, w http.ResponseWriter) {
 		calls++
 		w.WriteHeader(http.StatusTeapot)
 	})
@@ -496,5 +497,61 @@ func TestServerOptionWorksForAnyServerType(t *testing.T) {
 
 	if want, have := 2, calls; want != have {
 		t.Errorf("error encoder calls: want %d, have %d", want, have)
+	}
+}
+
+func TestServerAfterAcceptsResponseFuncs(t *testing.T) {
+	handler := httptransport.NewServer(
+		gkit.NopEndpoint[struct{}, struct{}],
+		gkit.NopEncoderDecoder,
+		httptransport.EncodeJSONResponse,
+		httptransport.ServerAfter(
+			httptransport.SetResponseHeader("X-Trace", "abc"),
+			httptransport.SetContentType("application/vnd.api+json"),
+		),
+	)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if want, have := "abc", rec.Header().Get("X-Trace"); want != have {
+		t.Errorf("X-Trace: want %q, have %q", want, have)
+	}
+}
+
+func TestDefaultErrorEncoderUnwrapsErrors(t *testing.T) {
+	rec := httptest.NewRecorder()
+	httptransport.DefaultErrorEncoder(context.Background(), fmt.Errorf("get order: %w", enhancedError{}), rec)
+
+	if want, have := http.StatusTeapot, rec.Code; want != have {
+		t.Errorf("StatusCode: want %d, have %d", want, have)
+	}
+	if want, have := "1", rec.Header().Get("X-Enhanced"); want != have {
+		t.Errorf("X-Enhanced: want %q, have %q", want, have)
+	}
+	if want, have := `{"err":"enhanced"}`, rec.Body.String(); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
+	}
+}
+
+// goKitStyleErrorEncoder has the signature of go-kit's http.ErrorEncoder.
+func goKitStyleErrorEncoder(_ context.Context, err error, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusConflict)
+	_, _ = w.Write([]byte(err.Error()))
+}
+
+func TestServerErrorEncoderAcceptsGoKitSignature(t *testing.T) {
+	handler := httptransport.NewServer(
+		func(context.Context, struct{}) (struct{}, error) { return struct{}{}, errors.New("dang") },
+		gkit.NopEncoderDecoder,
+		httptransport.EncodeJSONResponse,
+		httptransport.ServerErrorEncoder(goKitStyleErrorEncoder),
+	)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if want, have := http.StatusConflict, rec.Code; want != have {
+		t.Errorf("StatusCode: want %d, have %d", want, have)
 	}
 }

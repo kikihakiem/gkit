@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	gkit "github.com/kikihakiem/gkit/core"
 	"net/http"
 )
 
@@ -9,17 +10,17 @@ import (
 // request context. In Servers, RequestFuncs are executed prior to invoking the
 // endpoint. In Clients, RequestFuncs are executed after creating the request
 // but prior to invoking the HTTP client.
-type RequestFunc func(context.Context, *http.Request) context.Context
+type RequestFunc = gkit.BeforeRequestFunc[*http.Request]
 
 // ServerResponseFunc may take information from a request context and use it to
 // manipulate a ResponseWriter. ServerResponseFuncs are only executed in
 // servers, after invoking the endpoint but prior to writing a response.
-type ServerResponseFunc func(context.Context, http.ResponseWriter) context.Context
+type ServerResponseFunc = gkit.AfterResponseFunc[http.ResponseWriter]
 
 // ClientResponseFunc may take information from an HTTP request and make the
 // response available for consumption. ClientResponseFuncs are only executed in
 // clients, after a request has been made, but prior to it being decoded.
-type ClientResponseFunc func(context.Context, *http.Response) context.Context
+type ClientResponseFunc = gkit.AfterResponseFunc[*http.Response]
 
 // SetContentType returns a ServerResponseFunc that sets the Content-Type header
 // to the provided value.
@@ -56,7 +57,6 @@ func PopulateRequestContext(ctx context.Context, r *http.Request) context.Contex
 		ContextKeyRequestRemoteAddr:      r.RemoteAddr,
 		ContextKeyRequestXForwardedFor:   r.Header.Get("X-Forwarded-For"),
 		ContextKeyRequestXForwardedProto: r.Header.Get("X-Forwarded-Proto"),
-		ContextKeyRequestAuthorization:   r.Header.Get("Authorization"),
 		ContextKeyRequestReferer:         r.Header.Get("Referer"),
 		ContextKeyRequestUserAgent:       r.Header.Get("User-Agent"),
 		ContextKeyRequestXRequestID:      r.Header.Get("X-Request-Id"),
@@ -101,10 +101,6 @@ const (
 	// ContextKeyRequestXForwardedProto is populated in the context by
 	// PopulateRequestContext. Its value is r.Header.Get("X-Forwarded-Proto").
 	ContextKeyRequestXForwardedProto
-
-	// ContextKeyRequestAuthorization is populated in the context by
-	// PopulateRequestContext. Its value is r.Header.Get("Authorization").
-	ContextKeyRequestAuthorization
 
 	// ContextKeyRequestReferer is populated in the context by
 	// PopulateRequestContext. Its value is r.Header.Get("Referer").

@@ -103,7 +103,7 @@ func (p Publisher[Req, Res]) Endpoint() gkit.Endpoint[Req, Res] {
 		}
 
 		for _, f := range p.after {
-			ctx = f(ctx, resp, err)
+			ctx = f(ctx, resp)
 		}
 
 		response, err = p.dec(ctx, resp)

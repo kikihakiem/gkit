@@ -108,7 +108,7 @@ func TestSubscriberErrorEncoder(t *testing.T) {
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		respEncoder,
-		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](func(ctx context.Context, js jetstream.JetStream, err error) {
+		jstransport.SubscriberErrorEncoder[emptyStruct, emptyStruct](func(ctx context.Context, err error, js jetstream.JetStream) {
 			resChan <- err.Error()
 		}),
 	)
@@ -211,10 +211,10 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		respEncoder,
-		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -242,7 +242,7 @@ func TestSubscriberFinalizerFunc(t *testing.T) {
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		gkit.NopResponseEncoder,
-		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
 		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, err error) {
@@ -307,7 +307,7 @@ func TestEncodeJSONError(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), jstransport.ContextKeyResponseSubject, subject)
 
-	jstransport.EncodeJSONError(ctx, &jetstreamMock{dataChan: dataChan, subjectChan: subjectChan}, errors.New("dang"))
+	jstransport.EncodeJSONError(ctx, errors.New("dang"), &jetstreamMock{dataChan: dataChan, subjectChan: subjectChan})
 
 	if want, have := subject, <-subjectChan; want != have {
 		t.Errorf("Subject: want %s, have %s", want, have)

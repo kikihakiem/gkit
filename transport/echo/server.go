@@ -3,6 +3,7 @@ package echo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -101,7 +102,7 @@ func ServerFinalizer(f ...ServerFinalizerFunc) ServerOption {
 }
 
 // Handle implements echo.HandlerFunc.
-func (s Handler[Req, Res]) Handle(c echo.Context) error {
+func (s *Handler[Req, Res]) Handle(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	if len(s.finalizer) > 0 {
@@ -122,24 +123,24 @@ func (s Handler[Req, Res]) Handle(c echo.Context) error {
 	request, err := s.dec(ctx, c)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, c, err)
+		s.errorEncoder(ctx, err, c)
 		return err
 	}
 
 	response, err := s.e(ctx, request)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, c, err)
+		s.errorEncoder(ctx, err, c)
 		return err
 	}
 
 	for _, f := range s.after {
-		ctx = f(ctx, c, err)
+		ctx = f(ctx, c)
 	}
 
 	if err := s.enc(ctx, c, response); err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, c, err)
+		s.errorEncoder(ctx, err, c)
 		return err
 	}
 
@@ -197,17 +198,20 @@ func EncodeJSONResponse[Res any](_ context.Context, c echo.Context, response Res
 // will be applied to the response. If the error implements json.Marshaler, and
 // the marshaling succeeds, a content type of application/json and the JSON
 // encoded form of the error will be used. If the error implements StatusCoder,
-// the provided StatusCode will be used instead of 500.
-func DefaultErrorEncoder(_ context.Context, c echo.Context, err error) {
+// the provided StatusCode will be used instead of 500. These checks also find
+// an implementation inside a wrapped error, using errors.As.
+func DefaultErrorEncoder(_ context.Context, err error, c echo.Context) {
 	contentType, body := "text/plain; charset=utf-8", []byte(err.Error())
 
-	if marshaler, ok := err.(json.Marshaler); ok {
+	var marshaler json.Marshaler
+	if errors.As(err, &marshaler) {
 		if jsonBody, marshalErr := marshaler.MarshalJSON(); marshalErr == nil {
 			contentType, body = "application/json; charset=utf-8", jsonBody
 		}
 	}
 
-	if headerer, ok := err.(Headerer); ok {
+	var headerer Headerer
+	if errors.As(err, &headerer) {
 		for k, values := range headerer.Headers() {
 			for _, v := range values {
 				c.Response().Header().Add(k, v)
@@ -216,7 +220,8 @@ func DefaultErrorEncoder(_ context.Context, c echo.Context, err error) {
 	}
 
 	code := http.StatusInternalServerError
-	if sc, ok := err.(StatusCoder); ok {
+	var sc StatusCoder
+	if errors.As(err, &sc) {
 		code = sc.StatusCode()
 	}
 
