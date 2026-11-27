@@ -55,8 +55,8 @@ func TestHTTPClient(t *testing.T) {
 		mustParse(server.URL),
 		encode,
 		decode,
-		httptransport.ClientBefore[struct{}, TestResponse](httptransport.SetRequestHeader(headerKey, headerVal)),
-		httptransport.ClientAfter[struct{}, TestResponse](afterFunc),
+		httptransport.ClientBefore(httptransport.SetRequestHeader(headerKey, headerVal)),
+		httptransport.ClientAfter(afterFunc),
 	)
 
 	res, err := client.Endpoint()(context.Background(), struct{}{})
@@ -118,7 +118,7 @@ func TestHTTPClientBufferedStream(t *testing.T) {
 		mustParse(server.URL),
 		encode,
 		decode,
-		httptransport.BufferedStream[struct{}, TestResponse](true),
+		httptransport.BufferedStream(true),
 	)
 
 	res, err := client.Endpoint()(context.Background(), struct{}{})
@@ -164,7 +164,7 @@ func TestClientFinalizer(t *testing.T) {
 		mustParse(server.URL),
 		encode,
 		decode,
-		httptransport.ClientFinalizer[struct{}, TestResponse](func(ctx context.Context, err error) {
+		httptransport.ClientFinalizer(func(ctx context.Context, err error) {
 			responseHeader := ctx.Value(httptransport.ContextKeyResponseHeaders).(http.Header)
 			if want, have := headerVal, responseHeader.Get(headerKey); want != have {
 				t.Errorf("%s: want %q, have %q", headerKey, want, have)
@@ -280,7 +280,7 @@ func TestSetClient(t *testing.T) {
 		&url.URL{},
 		encode,
 		decode,
-		httptransport.SetClient[any, string](testHttpClient),
+		httptransport.SetClient(testHttpClient),
 	).Endpoint()
 
 	resp, err := client(context.Background(), nil)

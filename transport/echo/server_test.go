@@ -66,7 +66,7 @@ func TestServerErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, echo.Context, emptyStruct) error { return nil },
-		echotransport.ServerErrorEncoder[emptyStruct, emptyStruct](func(_ context.Context, c echo.Context, err error) { c.Response().WriteHeader(code(err)) }),
+		echotransport.ServerErrorEncoder(func(_ context.Context, c echo.Context, err error) { c.Response().WriteHeader(code(err)) }),
 	)
 	rec, _ := handleWith[emptyStruct, emptyStruct](handlerFunc)
 	if want, have := http.StatusTeapot, rec.Result().StatusCode; want != have {
@@ -81,7 +81,7 @@ func TestServerErrorHandler(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, echo.Context, emptyStruct) error { return nil },
-		echotransport.ServerErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		echotransport.ServerErrorHandler(gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			msgChan <- err.Error()
 		})),
 	)
@@ -120,12 +120,12 @@ func TestMultipleServerBefore(t *testing.T) {
 			c.Response().Write([]byte(responseBody))
 			return nil
 		},
-		echotransport.ServerBefore[emptyStruct, emptyStruct](func(ctx context.Context, r echo.Context) context.Context {
+		echotransport.ServerBefore(func(ctx context.Context, r echo.Context) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		echotransport.ServerBefore[emptyStruct, emptyStruct](func(ctx context.Context, r echo.Context) context.Context {
+		echotransport.ServerBefore(func(ctx context.Context, r echo.Context) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerBefores are used")
 			}
@@ -163,12 +163,12 @@ func TestMultipleServerAfter(t *testing.T) {
 			c.Response().Write([]byte(responseBody))
 			return nil
 		},
-		echotransport.ServerAfter[emptyStruct, emptyStruct](func(ctx context.Context, _ echo.Context, _ error) context.Context {
+		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		echotransport.ServerAfter[emptyStruct, emptyStruct](func(ctx context.Context, _ echo.Context, _ error) context.Context {
+		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerAfters are used")
 			}
@@ -206,7 +206,7 @@ func TestServerFinalizer(t *testing.T) {
 			c.Response().Write([]byte(responseBody))
 			return nil
 		},
-		echotransport.ServerFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, code int, _ echo.Context) {
+		echotransport.ServerFinalizer(func(ctx context.Context, code int, _ echo.Context) {
 			if want, have := statusCode, code; want != have {
 				t.Errorf("StatusCode: want %d, have %d", want, have)
 			}
@@ -437,8 +437,8 @@ func testServer(t *testing.T) (step func(), resp <-chan *httptest.ResponseRecord
 			endpoint,
 			func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, echo.Context, emptyStruct) error { return nil },
-			echotransport.ServerBefore[emptyStruct, emptyStruct](func(ctx context.Context, _ echo.Context) context.Context { return ctx }),
-			echotransport.ServerAfter[emptyStruct, emptyStruct](func(ctx context.Context, _ echo.Context, _ error) context.Context { return ctx }),
+			echotransport.ServerBefore(func(ctx context.Context, _ echo.Context) context.Context { return ctx }),
+			echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context { return ctx }),
 		)
 	)
 	go func() {
