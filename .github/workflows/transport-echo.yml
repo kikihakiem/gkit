@@ -1,5 +1,11 @@
 name: Echo
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'transport/echo/**'
+      - 'core/**'
   pull_request:
     paths:
       - 'transport/echo/**'

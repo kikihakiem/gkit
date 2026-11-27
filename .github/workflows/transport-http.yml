@@ -1,5 +1,11 @@
 name: HTTP
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'transport/http/**'
+      - 'core/**'
   pull_request:
     paths:
       - 'transport/http/**'

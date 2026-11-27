@@ -1,5 +1,11 @@
 name: Jetstream
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'transport/jetstream/**'
+      - 'core/**'
   pull_request:
     paths:
       - 'transport/jetstream/**'
