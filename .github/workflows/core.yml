@@ -1,5 +1,10 @@
 name: Core
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'core/**'
   pull_request:
     paths:
       - 'core/**'

@@ -1,2 +1,2 @@
-// package echo provides a general purpose HTTP binding for gkit.Endpoint.
+// Package echo serves a gkit.Endpoint as an echo.HandlerFunc.
 package echo
