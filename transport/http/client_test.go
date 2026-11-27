@@ -341,3 +341,64 @@ type httpClientFunc func(req *http.Request) (*http.Response, error)
 func (f httpClientFunc) Do(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
+
+type multiHeaderRequest struct{}
+
+func (multiHeaderRequest) Headers() http.Header {
+	return http.Header{"X-Tag": []string{"a", "b"}}
+}
+
+func TestEncodeJSONRequestKeepsAllHeaderValues(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/", nil)
+
+	if err := httptransport.EncodeJSONRequest(context.Background(), r, multiHeaderRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if want, have := []string{"a", "b"}, r.Header.Values("X-Tag"); strings.Join(want, ",") != strings.Join(have, ",") {
+		t.Errorf("want %v, have %v", want, have)
+	}
+}
+
+func TestEncodeJSONRequestSetsContentLength(t *testing.T) {
+	type seen struct {
+		length   int64
+		encoding []string
+		body     string
+	}
+	seenChan := make(chan seen, 2)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A 307 makes the client send the request body a second time.
+		if r.URL.Path == "/old" {
+			http.Redirect(w, r, "/new", http.StatusTemporaryRedirect)
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		seenChan <- seen{r.ContentLength, r.TransferEncoding, string(b)}
+	}))
+	defer server.Close()
+
+	target, _ := url.Parse(server.URL + "/old")
+	client := httptransport.NewClient(
+		http.MethodPost,
+		target,
+		httptransport.EncodeJSONRequest[map[string]string],
+		func(context.Context, *http.Response) (struct{}, error) { return struct{}{}, nil },
+	).Endpoint()
+
+	if _, err := client(context.Background(), map[string]string{"foo": "bar"}); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case got := <-seenChan:
+		want := "{\"foo\":\"bar\"}\n"
+		if got.body != want || got.length != int64(len(want)) || len(got.encoding) != 0 {
+			t.Errorf("want body %q with Content-Length %d, have body %q with Content-Length %d and Transfer-Encoding %v",
+				want, len(want), got.body, got.length, got.encoding)
+		}
+	default:
+		t.Fatal("the client did not follow the 307 redirect with the request body")
+	}
+}

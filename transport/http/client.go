@@ -182,15 +182,28 @@ func EncodeJSONRequest[Req any](c context.Context, r *http.Request, request Req)
 	r.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 	if headerer, ok := any(request).(Headerer); ok {
-		for k := range headerer.Headers() {
-			r.Header.Set(k, headerer.Headers().Get(k))
+		for k, values := range headerer.Headers() {
+			for _, v := range values {
+				r.Header.Add(k, v)
+			}
 		}
 	}
 
 	var b bytes.Buffer
-	r.Body = io.NopCloser(&b)
+	if err := json.NewEncoder(&b).Encode(request); err != nil {
+		return err
+	}
 
-	return json.NewEncoder(&b).Encode(request)
+	// ContentLength avoids chunked encoding, and GetBody lets the client send
+	// the body again when it follows a 307 or 308 redirect.
+	body := b.Bytes()
+	r.ContentLength = int64(len(body))
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+
+	return nil
 }
 
 func makeCreateRequestFunc[Req any](method string, target *url.URL, enc EncodeRequestFunc[Req]) gkit.EncodeDecodeFunc[Req, *http.Request] {
