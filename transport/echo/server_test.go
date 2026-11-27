@@ -67,7 +67,7 @@ func TestServerErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, echo.Context, emptyStruct) error { return nil },
-		echotransport.ServerErrorEncoder(func(_ context.Context, c echo.Context, err error) { c.Response().WriteHeader(code(err)) }),
+		echotransport.ServerErrorEncoder(func(_ context.Context, err error, c echo.Context) { c.Response().WriteHeader(code(err)) }),
 	)
 	rec, _ := handleWith[emptyStruct, emptyStruct](handlerFunc)
 	if want, have := http.StatusTeapot, rec.Result().StatusCode; want != have {
@@ -464,7 +464,7 @@ func handleWith[Req, Res any](handlerFunc echo.HandlerFunc) (*httptest.ResponseR
 func TestDefaultErrorEncoderUnwrapsErrors(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
-	echotransport.DefaultErrorEncoder(context.Background(), c, fmt.Errorf("get order: %w", enhancedError{}))
+	echotransport.DefaultErrorEncoder(context.Background(), fmt.Errorf("get order: %w", enhancedError{}), c)
 
 	if want, have := http.StatusTeapot, rec.Code; want != have {
 		t.Errorf("StatusCode: want %d, have %d", want, have)

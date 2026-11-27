@@ -123,14 +123,14 @@ func (s *Handler[Req, Res]) Handle(c echo.Context) error {
 	request, err := s.dec(ctx, c)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, c, err)
+		s.errorEncoder(ctx, err, c)
 		return err
 	}
 
 	response, err := s.e(ctx, request)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, c, err)
+		s.errorEncoder(ctx, err, c)
 		return err
 	}
 
@@ -140,7 +140,7 @@ func (s *Handler[Req, Res]) Handle(c echo.Context) error {
 
 	if err := s.enc(ctx, c, response); err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, c, err)
+		s.errorEncoder(ctx, err, c)
 		return err
 	}
 
@@ -200,7 +200,7 @@ func EncodeJSONResponse[Res any](_ context.Context, c echo.Context, response Res
 // encoded form of the error will be used. If the error implements StatusCoder,
 // the provided StatusCode will be used instead of 500. These checks also find
 // an implementation inside a wrapped error, using errors.As.
-func DefaultErrorEncoder(_ context.Context, c echo.Context, err error) {
+func DefaultErrorEncoder(_ context.Context, err error, c echo.Context) {
 	contentType, body := "text/plain; charset=utf-8", []byte(err.Error())
 
 	var marshaler json.Marshaler

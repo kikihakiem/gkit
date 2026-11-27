@@ -122,14 +122,14 @@ func (s *Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	request, err := s.dec(ctx, r)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, w, err)
+		s.errorEncoder(ctx, err, w)
 		return
 	}
 
 	response, err := s.e(ctx, request)
 	if err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, w, err)
+		s.errorEncoder(ctx, err, w)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (s *Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.enc(ctx, w, response); err != nil {
 		s.errorHandler.Handle(ctx, err)
-		s.errorEncoder(ctx, w, err)
+		s.errorEncoder(ctx, err, w)
 		return
 	}
 }
@@ -202,7 +202,7 @@ func EncodeJSONResponse[Res any](_ context.Context, w http.ResponseWriter, respo
 // encoded form of the error will be used. If the error implements StatusCoder,
 // the provided StatusCode will be used instead of 500. These checks also find
 // an implementation inside a wrapped error, using errors.As.
-func DefaultErrorEncoder(_ context.Context, w http.ResponseWriter, err error) {
+func DefaultErrorEncoder(_ context.Context, err error, w http.ResponseWriter) {
 	contentType, body := "text/plain; charset=utf-8", []byte(err.Error())
 
 	var marshaler json.Marshaler

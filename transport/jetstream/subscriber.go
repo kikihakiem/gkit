@@ -148,7 +148,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		request, err := s.dec(ctx, msg)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			s.errorEncoder(ctx, js, err)
+			s.errorEncoder(ctx, err, js)
 
 			return
 		}
@@ -156,7 +156,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		response, err = s.e(ctx, request)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			s.errorEncoder(ctx, js, err)
+			s.errorEncoder(ctx, err, js)
 
 			return
 		}
@@ -168,7 +168,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		err = s.enc(ctx, js, response)
 		if err != nil {
 			s.errorHandler.Handle(ctx, err)
-			s.errorEncoder(ctx, js, err)
+			s.errorEncoder(ctx, err, js)
 
 			return
 		}
@@ -214,7 +214,7 @@ type ErrResponse struct {
 
 // EncodeJSONError writes the error to the subject set by
 // SubscriberResponseSubject. It publishes nothing when the subject is empty.
-func EncodeJSONError(ctx context.Context, js jetstream.JetStream, err error) {
+func EncodeJSONError(ctx context.Context, err error, js jetstream.JetStream) {
 	subject, _ := ctx.Value(ContextKeyResponseSubject).(string)
 	if subject == "" {
 		return
