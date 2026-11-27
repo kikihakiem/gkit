@@ -100,7 +100,7 @@ func ServerFinalizer(f ...ServerFinalizerFunc) ServerOption {
 }
 
 // ServeHTTP implements http.Handler.
-func (s Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Server[Req, Res]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if len(s.finalizer) > 0 {

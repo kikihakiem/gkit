@@ -102,7 +102,7 @@ func ServerFinalizer(f ...ServerFinalizerFunc) ServerOption {
 }
 
 // Handle implements echo.HandlerFunc.
-func (s Handler[Req, Res]) Handle(c echo.Context) error {
+func (s *Handler[Req, Res]) Handle(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	if len(s.finalizer) > 0 {
