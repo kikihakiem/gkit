@@ -29,8 +29,6 @@ func CreateUserEndpoint(ctx context.Context, request dto.CreateUserRequest) (dto
 }
 ```
 
-If a route uses a decoder that returns a different type than the endpoint accepts, the code does not compile. With Go kit, the same mistake fails only when a request arrives.
-
 ## Modules
 
 Each directory is a separate Go module, so a service downloads only the transports it uses.
@@ -168,15 +166,6 @@ func encodeError(ctx context.Context, err error, w http.ResponseWriter) { /* ...
 
 httptransport.NewServer(endpoint, decode, encode, httptransport.ServerErrorEncoder(encodeError))
 ```
-
-## Coming from Go kit
-
-The structure and most names are the same as in Go kit. These parts are different:
-
-- Endpoints, decoders and encoders use your types instead of `interface{}`.
-- Options have no type parameters, so one option value works for every route.
-- `gkit.Chain(endpoint, middlewares...)` takes the endpoint first, so that Go can infer the types.
-- gkit has transports for `net/http`, Echo and NATS JetStream. It has no gRPC transport, service discovery or circuit breaker.
 
 ## Versioning
 
