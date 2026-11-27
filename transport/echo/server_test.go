@@ -5,6 +5,7 @@ package echo_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -458,4 +459,20 @@ func handleWith[Req, Res any](handlerFunc echo.HandlerFunc) (*httptest.ResponseR
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	return rec, handlerFunc(c)
+}
+
+func TestDefaultErrorEncoderUnwrapsErrors(t *testing.T) {
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, "/", nil), rec)
+	echotransport.DefaultErrorEncoder(context.Background(), c, fmt.Errorf("get order: %w", enhancedError{}))
+
+	if want, have := http.StatusTeapot, rec.Code; want != have {
+		t.Errorf("StatusCode: want %d, have %d", want, have)
+	}
+	if want, have := "1", rec.Header().Get("X-Enhanced"); want != have {
+		t.Errorf("X-Enhanced: want %q, have %q", want, have)
+	}
+	if want, have := `{"err":"enhanced"}`, rec.Body.String(); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
+	}
 }

@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -515,5 +516,20 @@ func TestServerAfterAcceptsResponseFuncs(t *testing.T) {
 
 	if want, have := "abc", rec.Header().Get("X-Trace"); want != have {
 		t.Errorf("X-Trace: want %q, have %q", want, have)
+	}
+}
+
+func TestDefaultErrorEncoderUnwrapsErrors(t *testing.T) {
+	rec := httptest.NewRecorder()
+	httptransport.DefaultErrorEncoder(context.Background(), rec, fmt.Errorf("get order: %w", enhancedError{}))
+
+	if want, have := http.StatusTeapot, rec.Code; want != have {
+		t.Errorf("StatusCode: want %d, have %d", want, have)
+	}
+	if want, have := "1", rec.Header().Get("X-Enhanced"); want != have {
+		t.Errorf("X-Enhanced: want %q, have %q", want, have)
+	}
+	if want, have := `{"err":"enhanced"}`, rec.Body.String(); want != have {
+		t.Errorf("Body: want %s, have %s", want, have)
 	}
 }
