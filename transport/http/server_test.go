@@ -174,12 +174,12 @@ func TestMultipleServerAfter(t *testing.T) {
 			w.Write([]byte(responseBody))
 			return nil
 		},
-		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
+		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
+		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerAfters are used")
 			}
@@ -444,7 +444,7 @@ func testServer(t *testing.T) (step func(), resp <-chan *http.Response) {
 			func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
 			httptransport.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context { return ctx }),
-			httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context { return ctx }),
+			httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter) context.Context { return ctx }),
 		)
 	)
 	go func() {
@@ -496,5 +496,24 @@ func TestServerOptionWorksForAnyServerType(t *testing.T) {
 
 	if want, have := 2, calls; want != have {
 		t.Errorf("error encoder calls: want %d, have %d", want, have)
+	}
+}
+
+func TestServerAfterAcceptsResponseFuncs(t *testing.T) {
+	handler := httptransport.NewServer(
+		gkit.NopEndpoint[struct{}, struct{}],
+		gkit.NopEncoderDecoder,
+		httptransport.EncodeJSONResponse,
+		httptransport.ServerAfter(
+			httptransport.SetResponseHeader("X-Trace", "abc"),
+			httptransport.SetContentType("application/vnd.api+json"),
+		),
+	)
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if want, have := "abc", rec.Header().Get("X-Trace"); want != have {
+		t.Errorf("X-Trace: want %q, have %q", want, have)
 	}
 }

@@ -162,7 +162,7 @@ func (s Subscriber[Req, Res]) HandleMessage(js jetstream.JetStream) func(jetstre
 		}
 
 		for _, f := range s.after {
-			ctx = f(ctx, response, err)
+			ctx = f(ctx, response)
 		}
 
 		err = s.enc(ctx, js, response)

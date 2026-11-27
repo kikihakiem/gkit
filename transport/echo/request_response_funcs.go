@@ -2,6 +2,7 @@ package echo
 
 import (
 	"context"
+	gkit "github.com/kikihakiem/gkit/core"
 
 	"github.com/labstack/echo/v4"
 )
@@ -9,17 +10,12 @@ import (
 // RequestFunc may take information from an HTTP request and put it into a
 // request context. In Servers, RequestFuncs are executed prior to invoking the
 // endpoint.
-type RequestFunc func(context.Context, echo.Context) context.Context
+type RequestFunc = gkit.BeforeRequestFunc[echo.Context]
 
 // ServerResponseFunc may take information from a request context and use it to
 // manipulate a ResponseWriter. ServerResponseFuncs are only executed in
 // servers, after invoking the endpoint but prior to writing a response.
-type ServerResponseFunc func(context.Context, echo.Context) context.Context
-
-// ClientResponseFunc may take information from an HTTP request and make the
-// response available for consumption. ClientResponseFuncs are only executed in
-// clients, after a request has been made, but prior to it being decoded.
-type ClientResponseFunc func(context.Context, echo.Context) context.Context
+type ServerResponseFunc = gkit.AfterResponseFunc[echo.Context]
 
 // SetContentType returns a ServerResponseFunc that sets the Content-Type header
 // to the provided value.

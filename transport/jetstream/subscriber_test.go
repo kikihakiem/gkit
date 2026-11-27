@@ -211,10 +211,10 @@ func TestMultipleSubscriberAfter(t *testing.T) {
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		respEncoder,
-		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
-		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				errChan <- errors.New("value was not set properly when multiple SubscriberAfter are used")
 			} else {
@@ -242,7 +242,7 @@ func TestSubscriberFinalizerFunc(t *testing.T) {
 		gkit.NopEndpoint[emptyStruct, emptyStruct],
 		gkit.NopEncoderDecoder,
 		gkit.NopResponseEncoder,
-		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct, err error) context.Context {
+		jstransport.SubscriberAfter[emptyStruct](func(ctx context.Context, resp emptyStruct) context.Context {
 			return context.WithValue(ctx, "one", 1)
 		}),
 		jstransport.SubscriberFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, req jetstream.Msg, err error) {

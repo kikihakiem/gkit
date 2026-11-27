@@ -134,7 +134,7 @@ func (s Handler[Req, Res]) Handle(c echo.Context) error {
 	}
 
 	for _, f := range s.after {
-		ctx = f(ctx, c, err)
+		ctx = f(ctx, c)
 	}
 
 	if err := s.enc(ctx, c, response); err != nil {

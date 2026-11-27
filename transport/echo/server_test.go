@@ -163,12 +163,12 @@ func TestMultipleServerAfter(t *testing.T) {
 			c.Response().Write([]byte(responseBody))
 			return nil
 		},
-		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context {
+		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context {
+		echotransport.ServerAfter(func(ctx context.Context, _ echo.Context) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerAfters are used")
 			}
@@ -438,7 +438,7 @@ func testServer(t *testing.T) (step func(), resp <-chan *httptest.ResponseRecord
 			func(context.Context, echo.Context) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, echo.Context, emptyStruct) error { return nil },
 			echotransport.ServerBefore(func(ctx context.Context, _ echo.Context) context.Context { return ctx }),
-			echotransport.ServerAfter(func(ctx context.Context, _ echo.Context, _ error) context.Context { return ctx }),
+			echotransport.ServerAfter(func(ctx context.Context, _ echo.Context) context.Context { return ctx }),
 		)
 	)
 	go func() {
