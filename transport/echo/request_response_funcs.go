@@ -56,7 +56,6 @@ func PopulateRequestContext(ctx context.Context, c echo.Context) context.Context
 		ContextKeyRequestRemoteAddr:      c.Request().RemoteAddr,
 		ContextKeyRequestXForwardedFor:   c.Request().Header.Get("X-Forwarded-For"),
 		ContextKeyRequestXForwardedProto: c.Request().Header.Get("X-Forwarded-Proto"),
-		ContextKeyRequestAuthorization:   c.Request().Header.Get("Authorization"),
 		ContextKeyRequestReferer:         c.Request().Header.Get("Referer"),
 		ContextKeyRequestUserAgent:       c.Request().Header.Get("User-Agent"),
 		ContextKeyRequestXRequestID:      c.Request().Header.Get("X-Request-Id"),
@@ -101,10 +100,6 @@ const (
 	// ContextKeyRequestXForwardedProto is populated in the context by
 	// PopulateRequestContext. Its value is r.Header.Get("X-Forwarded-Proto").
 	ContextKeyRequestXForwardedProto
-
-	// ContextKeyRequestAuthorization is populated in the context by
-	// PopulateRequestContext. Its value is r.Header.Get("Authorization").
-	ContextKeyRequestAuthorization
 
 	// ContextKeyRequestReferer is populated in the context by
 	// PopulateRequestContext. Its value is r.Header.Get("Referer").
