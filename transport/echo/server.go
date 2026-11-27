@@ -12,9 +12,15 @@ import (
 
 // Handler wraps an endpoint and implements echo.HandlerFunc.
 type Handler[Req, Res any] struct {
-	e            gkit.Endpoint[Req, Res]
-	dec          gkit.EncodeDecodeFunc[echo.Context, Req]
-	enc          EncodeResponseFunc[Res]
+	e   gkit.Endpoint[Req, Res]
+	dec gkit.EncodeDecodeFunc[echo.Context, Req]
+	enc EncodeResponseFunc[Res]
+	serverOptions
+}
+
+// serverOptions holds the settings that do not depend on the request or
+// response type, so that ServerOption does not need type parameters.
+type serverOptions struct {
 	before       []gkit.BeforeRequestFunc[echo.Context]
 	after        []gkit.AfterResponseFunc[echo.Context]
 	errorEncoder gkit.ErrorEncoder[echo.Context]
@@ -28,17 +34,19 @@ func NewHandler[Req, Res any](
 	e gkit.Endpoint[Req, Res],
 	dec gkit.EncodeDecodeFunc[echo.Context, Req],
 	enc EncodeResponseFunc[Res],
-	options ...ServerOption[Req, Res],
+	options ...ServerOption,
 ) *Handler[Req, Res] {
 	s := &Handler[Req, Res]{
-		e:            e,
-		dec:          dec,
-		enc:          enc,
-		errorEncoder: DefaultErrorEncoder,
-		errorHandler: gkit.LogErrorHandler(nil),
+		e:   e,
+		dec: dec,
+		enc: enc,
+		serverOptions: serverOptions{
+			errorEncoder: DefaultErrorEncoder,
+			errorHandler: gkit.LogErrorHandler(nil),
+		},
 	}
 	for _, option := range options {
-		option(s)
+		option(&s.serverOptions)
 	}
 	return s
 }
@@ -48,32 +56,33 @@ func NewHandlerFunc[Req, Res any](
 	e gkit.Endpoint[Req, Res],
 	dec gkit.EncodeDecodeFunc[echo.Context, Req],
 	enc EncodeResponseFunc[Res],
-	options ...ServerOption[Req, Res],
+	options ...ServerOption,
 ) echo.HandlerFunc {
 	return NewHandler(e, dec, enc, options...).Handle
 }
 
-// ServerOption sets an optional parameter for servers.
-type ServerOption[Req, Res any] gkit.Option[*Handler[Req, Res]]
+// ServerOption sets an optional parameter for handlers. The same option value
+// works for handlers of any request and response type.
+type ServerOption func(*serverOptions)
 
 // ServerBefore functions are executed on the HTTP request object before the
 // request is decoded.
-func ServerBefore[Req, Res any](before ...gkit.BeforeRequestFunc[echo.Context]) ServerOption[Req, Res] {
-	return func(s *Handler[Req, Res]) { s.before = append(s.before, before...) }
+func ServerBefore(before ...gkit.BeforeRequestFunc[echo.Context]) ServerOption {
+	return func(s *serverOptions) { s.before = append(s.before, before...) }
 }
 
 // ServerAfter functions are executed on the HTTP response writer after the
 // endpoint is invoked, but before anything is written to the client.
-func ServerAfter[Req, Res any](after ...gkit.AfterResponseFunc[echo.Context]) ServerOption[Req, Res] {
-	return func(s *Handler[Req, Res]) { s.after = append(s.after, after...) }
+func ServerAfter(after ...gkit.AfterResponseFunc[echo.Context]) ServerOption {
+	return func(s *serverOptions) { s.after = append(s.after, after...) }
 }
 
 // ServerErrorEncoder is used to encode errors to the echo.Context
 // whenever they're encountered in the processing of a request. Clients can
 // use this to provide custom error formatting and response codes. By default,
 // errors will be written with the DefaultErrorEncoder.
-func ServerErrorEncoder[Req, Res any](ee gkit.ErrorEncoder[echo.Context]) ServerOption[Req, Res] {
-	return func(s *Handler[Req, Res]) { s.errorEncoder = ee }
+func ServerErrorEncoder(ee gkit.ErrorEncoder[echo.Context]) ServerOption {
+	return func(s *serverOptions) { s.errorEncoder = ee }
 }
 
 // ServerErrorHandler is used to handle non-terminal errors. By default, non-terminal errors
@@ -81,14 +90,14 @@ func ServerErrorEncoder[Req, Res any](ee gkit.ErrorEncoder[echo.Context]) Server
 // of error handling, including logging in more detail, should be performed in a
 // custom ServerErrorEncoder or ServerFinalizer, both of which have access to
 // the context.
-func ServerErrorHandler[Req, Res any](errorHandler gkit.ErrorHandler) ServerOption[Req, Res] {
-	return func(s *Handler[Req, Res]) { s.errorHandler = errorHandler }
+func ServerErrorHandler(errorHandler gkit.ErrorHandler) ServerOption {
+	return func(s *serverOptions) { s.errorHandler = errorHandler }
 }
 
 // ServerFinalizer is executed at the end of every HTTP request.
 // By default, no finalizer is registered.
-func ServerFinalizer[Req, Res any](f ...ServerFinalizerFunc) ServerOption[Req, Res] {
-	return func(s *Handler[Req, Res]) { s.finalizer = append(s.finalizer, f...) }
+func ServerFinalizer(f ...ServerFinalizerFunc) ServerOption {
+	return func(s *serverOptions) { s.finalizer = append(s.finalizer, f...) }
 }
 
 // Handle implements echo.HandlerFunc.
@@ -136,12 +145,6 @@ func (s Handler[Req, Res]) Handle(c echo.Context) error {
 
 	return nil
 }
-
-// ErrorEncoder is responsible for encoding an error to the ResponseWriter.
-// Users are encouraged to use custom ErrorEncoders to encode HTTP errors to
-// their clients, and will likely want to pass and check for their own error
-// types. See the example shipping/handling service.
-type ErrorEncoder func(ctx context.Context, err error, c echo.Context)
 
 // ServerFinalizerFunc can be used to perform work at the end of an HTTP
 // request, after the response has been written to the client. The principal

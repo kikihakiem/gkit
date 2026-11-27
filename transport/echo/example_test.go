@@ -24,7 +24,7 @@ func TestPopulateRequestContext(t *testing.T) {
 		},
 		func(context.Context, echo.Context) (struct{}, error) { return struct{}{}, nil },
 		func(context.Context, echo.Context, struct{}) error { return nil },
-		echotransport.ServerBefore[struct{}, struct{}](echotransport.PopulateRequestContext),
+		echotransport.ServerBefore(echotransport.PopulateRequestContext),
 	)
 
 	e := echo.New()

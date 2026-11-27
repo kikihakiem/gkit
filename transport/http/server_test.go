@@ -70,7 +70,7 @@ func TestServerErrorEncoder(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
-		httptransport.ServerErrorEncoder[emptyStruct, emptyStruct](func(_ context.Context, w http.ResponseWriter, err error) { w.WriteHeader(code(err)) }),
+		httptransport.ServerErrorEncoder(func(_ context.Context, w http.ResponseWriter, err error) { w.WriteHeader(code(err)) }),
 	)
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -87,7 +87,7 @@ func TestServerErrorHandler(t *testing.T) {
 		func(context.Context, emptyStruct) (emptyStruct, error) { return emptyStruct{}, errTeapot },
 		func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 		func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
-		httptransport.ServerErrorHandler[emptyStruct, emptyStruct](gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
+		httptransport.ServerErrorHandler(gkit.ErrorHandlerFunc(func(ctx context.Context, err error) {
 			msgChan <- err.Error()
 		})),
 	)
@@ -129,12 +129,12 @@ func TestMultipleServerBefore(t *testing.T) {
 			w.Write([]byte(responseBody))
 			return nil
 		},
-		httptransport.ServerBefore[emptyStruct, emptyStruct](func(ctx context.Context, r *http.Request) context.Context {
+		httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		httptransport.ServerBefore[emptyStruct, emptyStruct](func(ctx context.Context, r *http.Request) context.Context {
+		httptransport.ServerBefore(func(ctx context.Context, r *http.Request) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerBefores are used")
 			}
@@ -174,12 +174,12 @@ func TestMultipleServerAfter(t *testing.T) {
 			w.Write([]byte(responseBody))
 			return nil
 		},
-		httptransport.ServerAfter[emptyStruct, emptyStruct](func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
+		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
 			ctx = context.WithValue(ctx, "one", 1)
 
 			return ctx
 		}),
-		httptransport.ServerAfter[emptyStruct, emptyStruct](func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
+		httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context {
 			if _, ok := ctx.Value("one").(int); !ok {
 				t.Error("Value was not set properly when multiple ServerAfters are used")
 			}
@@ -219,7 +219,7 @@ func TestServerFinalizer(t *testing.T) {
 			w.Write([]byte(responseBody))
 			return nil
 		},
-		httptransport.ServerFinalizer[emptyStruct, emptyStruct](func(ctx context.Context, code int, _ *http.Request) {
+		httptransport.ServerFinalizer(func(ctx context.Context, code int, _ *http.Request) {
 			if want, have := statusCode, code; want != have {
 				t.Errorf("StatusCode: want %d, have %d", want, have)
 			}
@@ -443,8 +443,8 @@ func testServer(t *testing.T) (step func(), resp <-chan *http.Response) {
 			endpoint,
 			func(context.Context, *http.Request) (emptyStruct, error) { return emptyStruct{}, nil },
 			func(context.Context, http.ResponseWriter, emptyStruct) error { return nil },
-			httptransport.ServerBefore[emptyStruct, emptyStruct](func(ctx context.Context, _ *http.Request) context.Context { return ctx }),
-			httptransport.ServerAfter[emptyStruct, emptyStruct](func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context { return ctx }),
+			httptransport.ServerBefore(func(ctx context.Context, _ *http.Request) context.Context { return ctx }),
+			httptransport.ServerAfter(func(ctx context.Context, _ http.ResponseWriter, _ error) context.Context { return ctx }),
 		)
 	)
 	go func() {
@@ -458,4 +458,43 @@ func testServer(t *testing.T) (step func(), resp <-chan *http.Response) {
 		response <- resp
 	}()
 	return func() { stepch <- true }, response
+}
+
+func TestServerOptionWorksForAnyServerType(t *testing.T) {
+	var calls int
+
+	// One option value, used by two servers with different request and response types.
+	errorEncoder := httptransport.ServerErrorEncoder(func(_ context.Context, w http.ResponseWriter, _ error) {
+		calls++
+		w.WriteHeader(http.StatusTeapot)
+	})
+
+	failing := errors.New("dang")
+	handlers := []http.Handler{
+		httptransport.NewServer(
+			func(context.Context, string) (int, error) { return 0, failing },
+			gkit.NopEncoderDecoder,
+			httptransport.EncodeJSONResponse,
+			errorEncoder,
+		),
+		httptransport.NewServer(
+			func(context.Context, int) (string, error) { return "", failing },
+			gkit.NopEncoderDecoder,
+			httptransport.EncodeJSONResponse,
+			errorEncoder,
+		),
+	}
+
+	for i, h := range handlers {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+		if want, have := http.StatusTeapot, rec.Code; want != have {
+			t.Errorf("server %d: want %d, have %d", i, want, have)
+		}
+	}
+
+	if want, have := 2, calls; want != have {
+		t.Errorf("error encoder calls: want %d, have %d", want, have)
+	}
 }

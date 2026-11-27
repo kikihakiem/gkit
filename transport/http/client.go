@@ -18,9 +18,15 @@ type HTTPClient interface {
 
 // Client wraps a URL and provides a method that implements endpoint.Endpoint.
 type Client[Req, Res any] struct {
+	req gkit.EncodeDecodeFunc[Req, *http.Request]
+	dec gkit.EncodeDecodeFunc[*http.Response, Res]
+	clientOptions
+}
+
+// clientOptions holds the settings that do not depend on the request or
+// response type, so that ClientOption does not need type parameters.
+type clientOptions struct {
 	client         HTTPClient
-	req            gkit.EncodeDecodeFunc[Req, *http.Request]
-	dec            gkit.EncodeDecodeFunc[*http.Response, Res]
 	before         []RequestFunc
 	after          []ClientResponseFunc
 	finalizer      []ClientFinalizerFunc
@@ -28,60 +34,61 @@ type Client[Req, Res any] struct {
 }
 
 // NewClient constructs a usable Client for a single remote method.
-func NewClient[Req, Res any](method string, tgt *url.URL, enc EncodeRequestFunc[Req], dec gkit.EncodeDecodeFunc[*http.Response, Res], options ...ClientOption[Req, Res]) *Client[Req, Res] {
-	return NewExplicitClient[Req, Res](makeCreateRequestFunc(method, tgt, enc), dec, options...)
+func NewClient[Req, Res any](method string, tgt *url.URL, enc EncodeRequestFunc[Req], dec gkit.EncodeDecodeFunc[*http.Response, Res], options ...ClientOption) *Client[Req, Res] {
+	return NewExplicitClient(makeCreateRequestFunc(method, tgt, enc), dec, options...)
 }
 
 // NewExplicitClient is like NewClient but uses a CreateRequestFunc instead of a
 // method, target URL, and EncodeRequestFunc, which allows for more control over
 // the outgoing HTTP request.
-func NewExplicitClient[Req, Res any](req gkit.EncodeDecodeFunc[Req, *http.Request], dec gkit.EncodeDecodeFunc[*http.Response, Res], options ...ClientOption[Req, Res]) *Client[Req, Res] {
+func NewExplicitClient[Req, Res any](req gkit.EncodeDecodeFunc[Req, *http.Request], dec gkit.EncodeDecodeFunc[*http.Response, Res], options ...ClientOption) *Client[Req, Res] {
 	c := &Client[Req, Res]{
-		client: http.DefaultClient,
-		req:    req,
-		dec:    dec,
+		req:           req,
+		dec:           dec,
+		clientOptions: clientOptions{client: http.DefaultClient},
 	}
 	for _, option := range options {
-		option(c)
+		option(&c.clientOptions)
 	}
 	return c
 }
 
-// ClientOption sets an optional parameter for clients.
-type ClientOption[Req, Res any] gkit.Option[*Client[Req, Res]]
+// ClientOption sets an optional parameter for clients. The same option value
+// works for clients of any request and response type.
+type ClientOption func(*clientOptions)
 
 // SetClient sets the underlying HTTP client used for requests.
 // By default, http.DefaultClient is used.
-func SetClient[Req, Res any](client HTTPClient) ClientOption[Req, Res] {
-	return func(c *Client[Req, Res]) { c.client = client }
+func SetClient(client HTTPClient) ClientOption {
+	return func(c *clientOptions) { c.client = client }
 }
 
 // ClientBefore adds one or more RequestFuncs to be applied to the outgoing HTTP
 // request before it's invoked.
-func ClientBefore[Req, Res any](before ...RequestFunc) ClientOption[Req, Res] {
-	return func(c *Client[Req, Res]) { c.before = append(c.before, before...) }
+func ClientBefore(before ...RequestFunc) ClientOption {
+	return func(c *clientOptions) { c.before = append(c.before, before...) }
 }
 
 // ClientAfter adds one or more ClientResponseFuncs, which are applied to the
 // incoming HTTP response prior to it being decoded. This is useful for
 // obtaining anything off of the response and adding it into the context prior
 // to decoding.
-func ClientAfter[Req, Res any](after ...ClientResponseFunc) ClientOption[Req, Res] {
-	return func(c *Client[Req, Res]) { c.after = append(c.after, after...) }
+func ClientAfter(after ...ClientResponseFunc) ClientOption {
+	return func(c *clientOptions) { c.after = append(c.after, after...) }
 }
 
 // ClientFinalizer adds one or more ClientFinalizerFuncs to be executed at the
 // end of every HTTP request. Finalizers are executed in the order in which they
 // were added. By default, no finalizer is registered.
-func ClientFinalizer[Req, Res any](f ...ClientFinalizerFunc) ClientOption[Req, Res] {
-	return func(s *Client[Req, Res]) { s.finalizer = append(s.finalizer, f...) }
+func ClientFinalizer(f ...ClientFinalizerFunc) ClientOption {
+	return func(s *clientOptions) { s.finalizer = append(s.finalizer, f...) }
 }
 
 // BufferedStream sets whether the HTTP response body is left open, allowing it
 // to be read from later. Useful for transporting a file as a buffered stream.
 // That body has to be drained and closed to properly end the request.
-func BufferedStream[Req, Res any](buffered bool) ClientOption[Req, Res] {
-	return func(c *Client[Req, Res]) { c.bufferedStream = buffered }
+func BufferedStream(buffered bool) ClientOption {
+	return func(c *clientOptions) { c.bufferedStream = buffered }
 }
 
 // Endpoint returns a usable Go kit endpoint that calls the remote HTTP endpoint.
